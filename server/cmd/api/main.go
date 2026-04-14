@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"github.com/ICE-awa/renice-sl/internal/handler"
 	"github.com/ICE-awa/renice-sl/internal/router"
@@ -15,10 +14,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "shared/config/config.yaml", "path to config file")
-	flag.Parse()
-
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("Error loading config",
 			slog.String("error", err.Error()))

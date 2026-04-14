@@ -30,16 +30,14 @@ func NewNatsClient(cfg config.NatsConfig) (*NatsClient, error) {
 		}),
 	}
 
-	url := fmt.Sprintf("nats://%s:4222")
+	url := fmt.Sprintf("nats://%s:4222", cfg.Host)
 	nc, err := nats.Connect(url, opts...)
 	if err != nil {
-		nc.Close()
 		return nil, fmt.Errorf("Failed to initialize NATS: %w", err)
 	}
 
 	js, err := nc.JetStream()
 	if err != nil {
-		nc.Close()
 		return nil, fmt.Errorf("Failed to initialize JetStream: %w", err)
 	}
 

@@ -38,6 +38,7 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 func (h *HealthHandler) Readyz(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
+
 	if err := h.db.Ping(ctx); err != nil {
 		httputil.ServiceUnavailable(c, "Failed to connect to database")
 		return

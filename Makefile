@@ -14,10 +14,10 @@ benchmark: ## 跑 benchmark 做性能测试
 	go test -bench=. -run=^$ ./server/...
 
 migrate-up: ## migrate up。通过 make migrate-up DB_URL=xxx 使用
-	migrate -path ./migrations -database "$(DB_URL)" up
+	migrate -path ./server/migrations -database "$(DB_URL)" up
 
 migrate-down: ## 使 migration down 一个版本。通过 make migrate-down DB_URL=xxx 使用
-	migrate -path ./migrations -database "$(DB_URL)" up
+	migrate -path ./server/migrations -database "$(DB_URL)" up
 
 lint: ## 代码检查
 	golangci-lint run ./...
