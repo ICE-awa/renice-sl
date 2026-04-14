@@ -33,6 +33,7 @@ cover.out
 .air/
 tmp/
 air_errors.log
+.air.toml
 
 # Node / Next.js
 node_modules/
