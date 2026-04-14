@@ -16,3 +16,6 @@ redis:
   password: 000000
   db: 0
   pool_size: 20
+
+nats:
+  host: nats

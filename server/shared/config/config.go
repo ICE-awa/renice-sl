@@ -10,6 +10,7 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
+	Nats     NatsConfig     `mapstructure:"nats"`
 }
 
 type ServerConfig struct {
@@ -32,6 +33,10 @@ type RedisConfig struct {
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
 	PoolSize int    `mapstructure:"pool_size"`
+}
+
+type NatsConfig struct {
+	Host string `mapstructure:"host"`
 }
 
 func (d *DatabaseConfig) DSN() string {

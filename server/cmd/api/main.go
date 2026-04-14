@@ -10,6 +10,7 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/database"
 	"github.com/ICE-awa/renice-sl/shared/logger"
+	"github.com/ICE-awa/renice-sl/shared/mq"
 	"log/slog"
 )
 
@@ -42,13 +43,22 @@ func main() {
 	}
 	defer rdb.Close()
 
+	natsClient, err := mq.NewNatsClient(cfg.Nats)
+	if err != nil {
+		slog.Error("Error initializing NATS",
+			slog.String("error", err.Error()))
+	}
+	defer natsClient.Close()
+
 	slog.Info("Server Started",
 		slog.Int("port", cfg.Server.Port),
 		slog.String("mode", cfg.Server.Mode))
 
 	port := fmt.Sprintf(":%d", cfg.Server.Port)
 
-	h := &handler.Handlers{}
+	h := &handler.Handlers{
+		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
+	}
 
 	r := router.Setup(h)
 
