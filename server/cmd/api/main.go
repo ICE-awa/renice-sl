@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/ICE-awa/renice-sl/internal/handler"
+	handlerv1 "github.com/ICE-awa/renice-sl/internal/handler/v1"
+	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/internal/router"
+	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/shared/cache"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/database"
@@ -52,8 +55,13 @@ func main() {
 
 	port := fmt.Sprintf(":%d", cfg.Server.Port)
 
+	authRepo := repository.NewUserRepository(db)
+
+	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
+
 	h := &handler.Handlers{
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
+		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
 	}
 
 	r := router.Setup(h)

@@ -1,5 +1,5 @@
 services:
-  renice_sl:
+  renice-sl:
     build: ../../server/.
     ports:
       - "58000:8080"
