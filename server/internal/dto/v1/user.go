@@ -17,6 +17,10 @@ type UserLoginReq struct {
 	Password   string `json:"password" binding:"required,min=8,max=72"`
 }
 
+type UserLoginResp struct {
+	ExpiresIn int64 `json:"expires_in"`
+}
+
 type UserUpdateReq struct {
 	ID       int64   `json:"id" db:"id"`
 	Username *string `json:"username" db:"username"`

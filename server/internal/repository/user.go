@@ -172,7 +172,7 @@ func (r *userRepository) CheckConflict(c context.Context, username, email string
 	query := `
 		SELECT
 			EXISTS(SELECT 1 FROM users WHERE username = $1) AS username_exists,
-			EXISTS(SELECT 1 FROM users WHERE email = $2) AS email_exists,
+			EXISTS(SELECT 1 FROM users WHERE email = $2) AS email_exists
 	`
 
 	var resp dtov1.UserRegisterConflictResp

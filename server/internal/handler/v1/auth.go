@@ -90,7 +90,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		true,
 	)
 
-	httputil.OK(c, nil)
+	resp := &dtov1.UserLoginResp{
+		ExpiresIn: int64(h.cfg.AccessExpires.Seconds()),
+	}
+	httputil.OK(c, resp)
 }
 
 // POST /api/v1/auth/refresh
