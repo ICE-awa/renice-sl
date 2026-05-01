@@ -60,3 +60,6 @@ appendonly.aof
 appendonlydir/
 *.rdb
 *.aof
+
+# data
+data/

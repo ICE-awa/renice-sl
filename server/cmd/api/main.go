@@ -64,7 +64,7 @@ func main() {
 		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
 	}
 
-	r := router.Setup(h)
+	r := router.Setup(h, &cfg.Jwt)
 
 	if err := r.Run(port); err != nil {
 		slog.Error("Error occurred while server starting",

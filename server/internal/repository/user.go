@@ -32,14 +32,13 @@ func (r *userRepository) CreateUser(c context.Context, user *model.User) (int64,
 	defer cancel()
 
 	query := `
-		INSERT INTO users(id, username, email, password, role, created_at, updated_at, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, now(), now(), now())
+		INSERT INTO users(username, email, password, role, created_at, updated_at, deleted_at)
+		VALUES ($1, $2, $3, $4, now(), now(), now())
 		RETURNING id;
 	`
 
 	var id int64
 	err := r.db.QueryRow(ctx, query,
-		user.ID,
 		user.Username,
 		user.Email,
 		user.Password,

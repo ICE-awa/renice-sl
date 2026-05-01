@@ -53,6 +53,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req dtov1.UserLoginReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidParam, "Invalid params")
+		return
 	}
 
 	tokenPair, err := h.svc.Login(c.Request.Context(), &req)
@@ -73,7 +74,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.SetCookie(
 		"access_token",
 		tokenPair.AccessToken,
-		int(h.cfg.AccessExpires),
+		int(h.cfg.AccessExpires.Seconds()),
 		"/",
 		"",
 		false,
@@ -83,7 +84,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.SetCookie(
 		"refresh_token",
 		tokenPair.RefreshToken,
-		int(h.cfg.RefreshExpires),
+		int(h.cfg.RefreshExpires.Seconds()),
 		"/api/v1/auth/refresh",
 		"",
 		false,
@@ -118,7 +119,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.SetCookie(
 		"access_token",
 		tokenPair.AccessToken,
-		int(h.cfg.AccessExpires),
+		int(h.cfg.AccessExpires.Seconds()),
 		"/",
 		"",
 		false,
@@ -128,7 +129,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.SetCookie(
 		"refresh_token",
 		tokenPair.RefreshToken,
-		int(h.cfg.RefreshExpires),
+		int(h.cfg.RefreshExpires.Seconds()),
 		"/api/v1/auth/refresh",
 		"",
 		false,
