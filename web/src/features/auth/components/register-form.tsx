@@ -1,7 +1,7 @@
 "use client";
 import { useForm } from "react-hook-form";
 import { RegisterInput, registerSchema } from "../schemas";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
@@ -12,9 +12,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { register } from "../api";
+import { register, RegisterConflictResp } from "../api";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { ApiError } from "@/lib/api";
+import Link from "next/link";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -36,18 +38,37 @@ export function RegisterForm() {
       toast.success("注册成功");
       router.push("/login");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "注册失败";
-      form.setError("root", { message });
-      toast.error(message);
+      if (err instanceof ApiError) {
+        const conflict = err.data as RegisterConflictResp | undefined;
+
+        if (conflict?.is_username_conflict) {
+          form.setError("username", { message: "用户名已被占用" });
+        }
+
+        if (conflict?.is_email_conflict) {
+          form.setError("email", { message: "邮箱已被占用" });
+        }
+
+        if (conflict?.is_username_conflict || conflict?.is_email_conflict) {
+          toast.error("邮箱名或用户已被占用");
+          return;
+        }
+      }
     }
+  }
+
+  async function onSendCode() {
+    // TODO 后续添加发送验证码的功能
   }
 
   return (
     <Card className="w-full max-w-sm">
-      <CardHeader>注册</CardHeader>
+      <CardHeader>
+        <CardTitle>注册</CardTitle>
+      </CardHeader>
 
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.username}>
               <FieldLabel htmlFor="username">用户名</FieldLabel>
@@ -94,24 +115,42 @@ export function RegisterForm() {
             </Field>
             <Field data-invalid={!!form.formState.errors.code}>
               <FieldLabel htmlFor="code">验证码</FieldLabel>
-              <Input
-                id="code"
-                placeholder="请输入验证码"
-                {...form.register("code")}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="code"
+                  placeholder="请输入验证码"
+                  {...form.register("code")}
+                />
+
+                <Button type="button" variant="outline" onClick={onSendCode}>
+                  获取邮箱验证码
+                </Button>
+                {/* TODO 后续添加发送验证码的功能 */}
+              </div>
               <FieldError errors={[form.formState.errors.code]} />
-              {/* TODO 后续添加发送验证码的功能 */}
             </Field>
           </FieldGroup>
-          <FieldError errors={[form.formState.errors.root]} />
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={form.formState.isSubmitting}
-          >
-            注册
-          </Button>
+          <div className="space-y-3">
+            <FieldError errors={[form.formState.errors.root]} />
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? "注册中..." : "注册"}
+            </Button>
+          </div>
         </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          已经有账号？{" "}
+          <Link
+            href="/login"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            去登录
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );

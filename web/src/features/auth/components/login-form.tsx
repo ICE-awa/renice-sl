@@ -16,6 +16,7 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { toast } from "sonner";
 import { login } from "../api";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function LoginForm() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function LoginForm() {
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.identifier}>
               <FieldLabel htmlFor="identifier">用户名或邮箱</FieldLabel>
@@ -68,16 +69,28 @@ export function LoginForm() {
               <FieldDescription>请输入密码</FieldDescription>
               <FieldError errors={[form.formState.errors.password]} />
             </Field>
-            <FieldError errors={[form.formState.errors.root]} />
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={form.formState.isSubmitting}
-            >
-              登录
-            </Button>
+            <div className="space-y-3">
+              <FieldError errors={[form.formState.errors.root]} />
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? "登录中..." : "登录"}
+              </Button>
+            </div>
           </FieldGroup>
         </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          还没有账号？{" "}
+          <Link
+            href="/register"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            去注册
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );

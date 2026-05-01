@@ -4,6 +4,18 @@ export type ApiResponse<T> = {
   message: string;
 };
 
+export class ApiError<T = unknown> extends Error {
+  constructor(
+    message: string,
+    public readonly code: number,
+    public readonly status: number,
+    public readonly data?: T,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -20,7 +32,7 @@ export async function apiFetch<T>(
   const body = (await res.json()) as ApiResponse<T>;
 
   if (!res.ok || body.code !== 0) {
-    throw new Error(body.message);
+    throw new ApiError(body.message, body.code, res.status, body.data);
   }
 
   return body.data as T;
