@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { login } from "../api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { scheduleRefresh } from "../session";
+import { scheduleRefresh } from "../../protected/components/session";
 
 export function LoginForm() {
   const router = useRouter();

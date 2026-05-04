@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, refreshAccessToken } from "@/lib/api";
 import { LoginInput, RegisterInput } from "./schemas";
 import { CurrentUser, LoginResp } from "./types";
 
@@ -19,9 +19,7 @@ export function register(input: RegisterInput) {
 }
 
 export function refresh() {
-  return apiFetch<LoginResp>("/api/v1/auth/refresh", {
-    method: "POST",
-  });
+  return refreshAccessToken<LoginResp>();
 }
 
 export function logout() {

@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/features/auth/api";
-import { clearScheduledRefresh } from "@/features/auth/session";
+import { clearScheduledRefresh } from "@/features/protected/components/session";
 import { ApiError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

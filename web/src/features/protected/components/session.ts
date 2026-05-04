@@ -1,4 +1,4 @@
-import { refresh } from "./api";
+import { refresh } from "../../auth/api";
 
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 

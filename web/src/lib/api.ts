@@ -22,6 +22,23 @@ export class ApiError<T = unknown> extends Error {
   }
 }
 
+let refreshPromise: Promise<unknown> | null = null;
+
+export function refreshAccessToken<T = unknown>(): Promise<T> {
+  if (refreshPromise) {
+    return refreshPromise as Promise<T>;
+  }
+
+  refreshPromise = apiFetch<T>("/api/v1/auth/refresh", {
+    method: "POST",
+    skipAuthRefresh: true,
+  }).finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise as Promise<T>;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: ApiFetchOptions,
