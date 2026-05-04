@@ -12,11 +12,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { register, RegisterConflictResp } from "../api";
+import { register } from "../api";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import Link from "next/link";
+import { RegisterConflictResp } from "../types";
 
 export function RegisterForm() {
   const router = useRouter();

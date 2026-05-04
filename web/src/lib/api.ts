@@ -4,6 +4,10 @@ export type ApiResponse<T> = {
   message: string;
 };
 
+type ApiFetchOptions = RequestInit & {
+  skipAuthRefresh?: boolean;
+};
+
 export class ApiError<T = unknown> extends Error {
   constructor(
     message: string,
@@ -18,7 +22,7 @@ export class ApiError<T = unknown> extends Error {
 
 export async function apiFetch<T>(
   path: string,
-  init?: RequestInit,
+  init?: ApiFetchOptions,
 ): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -30,6 +34,18 @@ export async function apiFetch<T>(
   });
 
   const body = (await res.json()) as ApiResponse<T>;
+
+  if (res.status === 401 && !init?.skipAuthRefresh) {
+    await apiFetch("/api/v1/auth/refresh", {
+      method: "POST",
+      skipAuthRefresh: true,
+    });
+
+    return apiFetch<T>(path, {
+      ...init,
+      skipAuthRefresh: true,
+    });
+  }
 
   if (!res.ok || body.code !== 0) {
     throw new ApiError(body.message, body.code, res.status, body.data);

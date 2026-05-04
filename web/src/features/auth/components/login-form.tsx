@@ -33,7 +33,7 @@ export function LoginForm() {
     try {
       await login(data);
       toast.success("登录成功");
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败";
       form.setError("root", { message });
