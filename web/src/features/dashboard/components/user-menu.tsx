@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/features/auth/api";
 import { clearScheduledRefresh } from "@/features/auth/session";
+import { ApiError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -36,7 +37,8 @@ export function UserMenu({ user }: UserMenuProps) {
       toast.success("退出登录成功！");
       router.push("/login");
     } catch (err) {
-      toast.error("服务器打了个盹");
+      const message = err instanceof ApiError ? err.message : "服务器打了个盹";
+      toast.error(message);
     }
   }
 

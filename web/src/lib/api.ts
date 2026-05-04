@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from "./api-error-message";
+
 export type ApiResponse<T> = {
   code: number;
   data?: T;
@@ -48,7 +50,8 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok || body.code !== 0) {
-    throw new ApiError(body.message, body.code, res.status, body.data);
+    const message = getApiErrorMessage(body.code, body.message);
+    throw new ApiError(message, body.code, res.status, body.data);
   }
 
   return body.data as T;
