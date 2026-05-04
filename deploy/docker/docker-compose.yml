@@ -1,5 +1,5 @@
 services:
-  renice_sl:
+  renice-sl:
     build: ../../server/.
     ports:
       - "58000:8080"
@@ -13,7 +13,7 @@ services:
       nats:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/healthz"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
     ports:
       - "58001:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "sh -c 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_DBNAME}'"]
       interval: 5s
@@ -50,7 +50,7 @@ services:
     container_name: renice-nats
     command: ["-js", "-m", "8222"]
     volumes:
-      - nats_data:/data
+      - ./data/nats_data:/data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz"]
       interval: 5s

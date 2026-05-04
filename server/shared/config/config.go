@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
+	"time"
 )
 
 type Config struct {
@@ -10,6 +11,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Nats     NatsConfig     `mapstructure:"nats"`
+	Jwt      JwtConfig      `mapstructure:"jwt"`
 }
 
 type ServerConfig struct {
@@ -36,6 +38,13 @@ type RedisConfig struct {
 
 type NatsConfig struct {
 	Host string `mapstructure:"host"`
+}
+
+type JwtConfig struct {
+	AccessSecret   string        `mapstructure:"access_token"`
+	RefreshSecret  string        `mapstructure:"refresh_token"`
+	AccessExpires  time.Duration `mapstructure:"access_expires"`
+	RefreshExpires time.Duration `mapstructure:"refresh_expires"`
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -70,6 +79,10 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("redis.db", "REDIS_DB")
 	_ = v.BindEnv("redis.pool_size", "REDIS_POOL_SIZE")
 	_ = v.BindEnv("nats.host", "NATS_HOST")
+	_ = v.BindEnv("jwt.access_secret", "JWT_ACCESS_SECRET")
+	_ = v.BindEnv("jwt.refresh_secret", "JWT_REFRESH_SECRET")
+	_ = v.BindEnv("jwt.access_expires", "JWT_ACCESS_EXPIRES")
+	_ = v.BindEnv("jwt.refresh_expires", "JWT_REFRESH_EXPIRES")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
