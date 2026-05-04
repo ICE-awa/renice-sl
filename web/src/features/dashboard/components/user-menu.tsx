@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/features/auth/api";
+import { clearScheduledRefresh } from "@/features/auth/session";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
   async function onLogout() {
     try {
+      clearScheduledRefresh();
       await logout();
       toast.success("退出登录成功！");
       router.push("/login");

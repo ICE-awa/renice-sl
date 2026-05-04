@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { login } from "../api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { scheduleRefresh } from "../session";
 
 export function LoginForm() {
   const router = useRouter();
@@ -31,7 +32,8 @@ export function LoginForm() {
 
   async function onSubmit(data: LoginInput) {
     try {
-      await login(data);
+      const resp = await login(data);
+      scheduleRefresh(resp.expires_in);
       toast.success("登录成功");
       router.push("/dashboard");
     } catch (err) {
