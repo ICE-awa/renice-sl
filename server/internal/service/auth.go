@@ -21,6 +21,7 @@ type AuthService interface {
 	Login(context.Context, *dtov1.UserLoginReq) (*dtov1.TokenPair, error)
 	Refresh(context.Context, string) (*dtov1.TokenPair, error)
 	Logout(context.Context, int64) error
+	Me(context.Context, int64) (*dtov1.MeResp, error)
 }
 
 type authService struct {
@@ -158,4 +159,19 @@ func (s *authService) Logout(c context.Context, userID int64) error {
 	key := fmt.Sprintf("%s:%d", consts.RedisRTKey, userID)
 	_, err := s.rdb.Del(c, key).Result()
 	return err
+}
+
+func (s *authService) Me(c context.Context, userID int64) (*dtov1.MeResp, error) {
+	user, err := s.repo.FindUserByID(c, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &dtov1.MeResp{
+		Username: user.Username,
+		Email:    user.Email,
+		Role:     user.Role,
+	}
+
+	return resp, nil
 }

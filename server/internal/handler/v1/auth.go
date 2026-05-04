@@ -101,7 +101,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	token, err := c.Cookie("refresh_token")
 	if err != nil {
-		httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidRefreshToken, "Invalid refresh token")
+		httputil.Fail(c, http.StatusUnauthorized, consts.CodeInvalidRefreshToken, "Invalid refresh token")
 		return
 	}
 
@@ -136,7 +136,10 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		true,
 	)
 
-	httputil.OK(c, nil)
+	resp := &dtov1.UserLoginResp{
+		ExpiresIn: int64(h.cfg.AccessExpires.Seconds()),
+	}
+	httputil.OK(c, resp)
 }
 
 // POST /api/v1/auth/logout
@@ -163,11 +166,27 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		"refresh_token",
 		"",
 		-1,
-		"/",
+		"/api/v1/auth/refresh",
 		"",
 		false,
 		true,
 	)
 
 	httputil.OK(c, nil)
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	resp, err := h.svc.Me(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httputil.Fail(c, http.StatusNotFound, consts.CodeUserNotFound, "User not found")
+		} else {
+			httputil.Fail(c, http.StatusInternalServerError, consts.CodeInternalServerError, "Server Temporarily Unavailable")
+		}
+		return
+	}
+
+	httputil.OK(c, resp)
 }

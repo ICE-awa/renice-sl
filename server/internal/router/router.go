@@ -17,6 +17,7 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			// auth
 			v1.POST("/auth/register", h.AuthHV1.Register)
 			v1.POST("/auth/login", h.AuthHV1.Login)
+			v1.POST("/auth/refresh", h.AuthHV1.Refresh)
 		}
 	}
 
@@ -26,8 +27,8 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 		v1 := protected.Group("/v1")
 		{
 			// auth
-			v1.POST("/auth/refresh", h.AuthHV1.Refresh)
 			v1.POST("/auth/logout", h.AuthHV1.Logout)
+			v1.GET("/auth/me", h.AuthHV1.Me)
 		}
 	}
 
