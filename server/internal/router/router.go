@@ -29,6 +29,14 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			// auth
 			v1.POST("/auth/logout", h.AuthHV1.Logout)
 			v1.GET("/auth/me", h.AuthHV1.Me)
+
+			// link
+			v1.GET("/links", h.LinkHV1.GetLinks)
+			v1.GET("/link/:id", h.LinkHV1.GetLinkByID)
+			v1.POST("/link", h.LinkHV1.CreateLink)
+			v1.PUT("/link/:id", h.LinkHV1.UpdateLink)
+			v1.DELETE("/link/:id", h.LinkHV1.DeleteLink)
+			v1.GET("/s/:code", h.LinkHV1.Redirect)
 		}
 	}
 

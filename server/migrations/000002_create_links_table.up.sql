@@ -4,6 +4,8 @@ CREATE TABLE links (
     code VARCHAR(10) NOT NULL UNIQUE,
     original_url TEXT NOT NULL,
     view_count BIGINT NOT NULL,
+    -- status 可以为 'active', 'inactive'
+    status VARCHAR(20) NOT NULL,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

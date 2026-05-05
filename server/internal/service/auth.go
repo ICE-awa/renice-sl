@@ -168,6 +168,7 @@ func (s *authService) Me(c context.Context, userID int64) (*dtov1.MeResp, error)
 	}
 
 	resp := &dtov1.MeResp{
+		ID:       user.ID,
 		Username: user.Username,
 		Email:    user.Email,
 		Role:     user.Role,
