@@ -78,7 +78,6 @@ export default function DashboardClient() {
   async function handleReset() {
     try {
       setSearchParams(originalSearchParams);
-      console.log(searchParams);
       await onRefreshTable(originalSearchParams);
       toast.info("成功重置搜索条件");
     } catch (err) {

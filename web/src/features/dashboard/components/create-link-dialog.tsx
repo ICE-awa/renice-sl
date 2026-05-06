@@ -8,13 +8,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { CreateLinkFormValues } from "../types";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { createLinkSchema } from "../schemas";
-import { ApiError } from "@/lib/api";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
@@ -52,8 +49,11 @@ export default function CreateLinkDialog({
     },
   });
 
-  // bug: 过期时间等于当日或者小于当日时，会报错 Cannot read properties of undefined(reading 'trim')
   async function handleSubmit(data: CreateLinkFormValues) {
+    if (!data.original_url) {
+      form.setError("original_url", { message: "请输入原链接" });
+      return;
+    }
     await onSubmit({
       original_url: data.original_url.trim(),
       expires_at: data.expires_at,
