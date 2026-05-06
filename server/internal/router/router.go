@@ -39,6 +39,7 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			v1.POST("/link", h.LinkHV1.CreateLink)
 			v1.PUT("/link/:id", h.LinkHV1.UpdateLink)
 			v1.DELETE("/link/:id", h.LinkHV1.DeleteLink)
+			v1.GET("/link/view", h.LinkHV1.GetViewCount)
 		}
 	}
 

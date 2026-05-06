@@ -134,3 +134,15 @@ func (h *LinkHandler) Redirect(c *gin.Context) {
 
 	httputil.Redirect(c, http.StatusFound, originalURL)
 }
+
+func (h *LinkHandler) GetViewCount(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	count, err := h.svc.GetViewCount(c.Request.Context(), userID)
+	if err != nil {
+		httputil.InternalServerError(c, "Failed to get view count")
+		return
+	}
+
+	httputil.OK(c, gin.H{"view_count": count})
+}

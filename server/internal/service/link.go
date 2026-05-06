@@ -15,6 +15,7 @@ type LinkService interface {
 	GetLinkByID(context.Context, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
 	Redirect(context.Context, string) (string, error)
+	GetViewCount(context.Context, int64) (int64, error)
 }
 
 type linkService struct {
@@ -90,4 +91,8 @@ func (s *linkService) Redirect(c context.Context, code string) (string, error) {
 	}
 
 	return originalURL, nil
+}
+
+func (s *linkService) GetViewCount(c context.Context, userID int64) (int64, error) {
+	return s.repo.GetViewCountByUserID(c, userID)
 }
