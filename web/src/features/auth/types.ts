@@ -8,6 +8,7 @@ export type RegisterConflictResp = {
 };
 
 export type CurrentUser = {
+  id: number;
   username: string;
   email: string;
   role: "user" | "admin";
