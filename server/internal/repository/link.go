@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/model"
@@ -35,8 +34,8 @@ func (r *linkRepository) CreateLink(c context.Context, req *dtov1.CreateLinkReq)
 	defer cancel()
 
 	query := `
-		INSERT INTO links(user_id, original_url, code, expires_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, now(), now())
+		INSERT INTO links(user_id, original_url, code, expires_at, created_at, updated_at, view_count, status)
+		VALUES ($1, $2, $3, $4, now(), now(), 0, 'active')
 		RETURNING id
 	`
 
@@ -241,19 +240,19 @@ func (r *linkRepository) CheckCodeConflict(c context.Context, code string) (bool
 	defer cancel()
 
 	query := `
-SELECT count(1) FROM links WHERE code = $1 AND deleted_at IS NULL
+SELECT EXISTS (
+	SELECT 1
+	FROM links
+	WHERE code = $1 AND deleted_at IS NULL
+)
 `
-
-	var res bool
-	err := r.db.QueryRow(ctx, query, code).Scan(&res)
+	var exists bool
+	err := r.db.QueryRow(ctx, query, code).Scan(&exists)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return true, nil
-		}
 		return false, err
 	}
 
-	return res, nil
+	return exists, nil
 }
 
 func (r *linkRepository) IncrementViewCount(c context.Context, code string) error {

@@ -31,11 +31,11 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 		if err != nil {
 			return err
 		}
-		ok, err := s.repo.CheckCodeConflict(c, code)
+		exists, err := s.repo.CheckCodeConflict(c, code)
 		if err != nil {
 			return err
 		}
-		if ok {
+		if !exists {
 			req.Code = code
 			break
 		}

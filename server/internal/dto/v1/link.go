@@ -11,13 +11,13 @@ type CreateLinkReq struct {
 
 type GetLinksReq struct {
 	UserID       int64      `json:"user_id"`
-	OriginalURL  *string    `json:"original_url"`
-	Code         *string    `json:"code"`
-	Status       *string    `json:"status"`
-	ExpiresBegin *time.Time `json:"expires_begin"`
-	ExpiresEnd   *time.Time `json:"expires_end"`
-	PageNum      int64      `json:"page_num"`
-	PageSize     int64      `json:"page_size"`
+	OriginalURL  *string    `form:"original_url" json:"original_url"`
+	Code         *string    `form:"code" json:"code"`
+	Status       *string    `form:"status" json:"status"`
+	ExpiresBegin *time.Time `form:"expires_begin" json:"expires_begin"`
+	ExpiresEnd   *time.Time `form:"expires_end" json:"expires_end"`
+	PageNum      int64      `form:"page_num" json:"page_num"`
+	PageSize     int64      `form:"page_size" json:"page_size"`
 }
 
 type LinkItem struct {
