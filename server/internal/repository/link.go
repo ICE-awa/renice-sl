@@ -57,13 +57,15 @@ func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]
 	argIndex := 2
 
 	if req.OriginalURL != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("original_url ILIKE $%d", argIndex))
-		args = append(args, *req.OriginalURL)
+		whereClauses = append(whereClauses, fmt.Sprintf("original_url LIKE $%d", argIndex))
+		searchArgs := fmt.Sprintf("%%%s%%", *req.OriginalURL)
+		args = append(args, searchArgs)
 		argIndex++
 	}
 	if req.Code != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("code ILIKE $%d", argIndex))
-		args = append(args, *req.Code)
+		whereClauses = append(whereClauses, fmt.Sprintf("code LIKE $%d", argIndex))
+		searchArgs := fmt.Sprintf("%%%s%%", *req.Code)
+		args = append(args, searchArgs)
 		argIndex++
 	}
 	if req.Status != nil {
