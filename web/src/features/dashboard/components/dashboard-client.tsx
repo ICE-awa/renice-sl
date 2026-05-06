@@ -34,8 +34,8 @@ export default function DashboardClient() {
   const [searchParams, setSearchParams] =
     useState<GetLinksInput>(originalSearchParams);
 
-  async function onRefreshTable() {
-    const data = await getLinks(searchParams);
+  async function onRefreshTable(params: GetLinksInput) {
+    const data = await getLinks(params);
     const stats = await getStats();
     setStats(stats);
     setLinks(data);
@@ -66,7 +66,7 @@ export default function DashboardClient() {
       //   };
       //   await handleSearch(params);
       setCreateOpen(false);
-      onRefreshTable();
+      await onRefreshTable(searchParams);
       toast.success("新建短链接成功");
     } catch (err) {
       const message =
@@ -79,7 +79,7 @@ export default function DashboardClient() {
     try {
       setSearchParams(originalSearchParams);
       console.log(searchParams);
-      onRefreshTable();
+      await onRefreshTable(originalSearchParams);
       toast.info("成功重置搜索条件");
     } catch (err) {
       const message =
@@ -94,7 +94,7 @@ export default function DashboardClient() {
         id: id,
         status: status === "active" ? "inactive" : "active",
       });
-      onRefreshTable();
+      await onRefreshTable(searchParams);
       toast.success("状态已更新");
     } catch (err) {
       const message =
@@ -120,7 +120,7 @@ export default function DashboardClient() {
           : undefined,
         status: values.enabled ? "active" : "inactive",
       });
-      onRefreshTable();
+      await onRefreshTable(searchParams);
       toast.success("成功更新链接信息");
     } catch (err) {
       const message =
@@ -132,7 +132,7 @@ export default function DashboardClient() {
   async function handleDelete(link: LinkItem) {
     try {
       await deleteLink(link.id);
-      onRefreshTable();
+      await onRefreshTable(searchParams);
       toast.success("成功删除链接");
     } catch (err) {
       const message =
