@@ -168,6 +168,11 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 		args = append(args, *req.OriginalURL)
 		argIndex++
 	}
+	if req.Status != nil {
+		setClauses = append(setClauses, fmt.Sprintf("status = $%d", argIndex))
+		args = append(args, *req.Status)
+		argIndex++
+	}
 
 	query := fmt.Sprintf(
 		"UPDATE links SET %s WHERE id = $%d AND user_id = $%d",

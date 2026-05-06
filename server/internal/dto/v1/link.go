@@ -36,6 +36,7 @@ type UpdateLinkReq struct {
 	UserID      int64      `json:"user_id"`
 	OriginalURL *string    `json:"original_url" binding:"url"`
 	ExpiresAt   *time.Time `json:"expires_at"`
+	Status      *string    `json:"status"`
 }
 
 type DeleteLinkReq struct {
