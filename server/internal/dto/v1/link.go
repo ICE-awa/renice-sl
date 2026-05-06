@@ -34,7 +34,7 @@ type LinkItem struct {
 type UpdateLinkReq struct {
 	ID          int64      `json:"id"`
 	UserID      int64      `json:"user_id"`
-	OriginalURL *string    `json:"original_url" binding:"url"`
+	OriginalURL *string    `json:"original_url" binding:"omitempty,url"`
 	ExpiresAt   *time.Time `json:"expires_at"`
 	Status      *string    `json:"status"`
 }
