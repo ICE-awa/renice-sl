@@ -21,6 +21,7 @@ type LinkRepository interface {
 	CheckCodeConflict(context.Context, string) (bool, error)
 	IncrementViewCount(context.Context, string) error
 	GetViewCountByUserID(context.Context, int64) (int64, error)
+	GetLinkCountByUserID(context.Context, int64) (int64, error)
 }
 type linkRepository struct {
 	db *pgxpool.Pool
@@ -281,6 +282,25 @@ func (r *linkRepository) GetViewCountByUserID(c context.Context, userID int64) (
 
 	query := `
 SELECT COALESCE(SUM(view_count), 0)
+FROM links
+WHERE user_id = $1 AND deleted_at IS NULL
+`
+
+	var total int64
+	err := r.db.QueryRow(ctx, query, userID).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+
+	return total, nil
+}
+
+func (r *linkRepository) GetLinkCountByUserID(c context.Context, userID int64) (int64, error) {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	query := `
+SELECT COALESCE(COUNT(*), 0)
 FROM links
 WHERE user_id = $1 AND deleted_at IS NULL
 `

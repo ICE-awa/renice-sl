@@ -43,3 +43,8 @@ type DeleteLinkReq struct {
 	ID     int64 `json:"id"`
 	UserID int64 `json:"user_id"`
 }
+
+type GetStatsResponse struct {
+	LinkCount int64 `json:"link_count"`
+	ViewCount int64 `json:"view_count"`
+}
