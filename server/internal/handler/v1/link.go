@@ -104,11 +104,15 @@ func (h *LinkHandler) GetLinkByID(c *gin.Context) {
 
 func (h *LinkHandler) DeleteLink(c *gin.Context) {
 	var req dtov1.DeleteLinkReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		httputil.BadRequest(c, "Invalid params")
+
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		httputil.BadRequest(c, "Invalid id")
 		return
 	}
 
+	req.ID = int64(id)
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.DeleteLink(c.Request.Context(), &req); err != nil {
