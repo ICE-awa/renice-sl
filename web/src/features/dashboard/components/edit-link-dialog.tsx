@@ -56,13 +56,15 @@ export default function EditLinkDialog({
       return;
     }
 
-    await onSubmit({
-      id: item.id,
-      original_url: data.original_url?.trim(),
-      expires_at: data.expires_at,
-      enabled: data.enabled,
-    });
-    onOpenChange(false);
+    try {
+      await onSubmit({
+        id: item.id,
+        original_url: data.original_url?.trim(),
+        expires_at: data.expires_at,
+        enabled: data.enabled,
+      });
+      onOpenChange(false);
+    } catch {}
   }
 
   useEffect(() => {

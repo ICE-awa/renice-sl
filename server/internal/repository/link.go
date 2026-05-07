@@ -15,7 +15,7 @@ type LinkRepository interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) (int64, error)
 	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
-	GetLinkByID(context.Context, int64) (*model.Link, error)
+	GetLinkByID(context.Context, int64, int64) (*model.Link, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
 	GetOriginalURLByCode(context.Context, string) (string, error)
 	CheckCodeConflict(context.Context, string) (bool, error)
@@ -187,19 +187,19 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	return err
 }
 
-func (r *linkRepository) GetLinkByID(c context.Context, id int64) (*model.Link, error) {
+func (r *linkRepository) GetLinkByID(c context.Context, id int64, userID int64) (*model.Link, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
 	query := `
 SELECT id, user_id, code, original_url, view_count, status, created_at, updated_at, expires_at
 FROM links
-WHERE id = $1 AND deleted_at IS NULL
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	`
 
 	resp := &model.Link{}
 
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id, userID).Scan(
 		&resp.ID,
 		&resp.UserID,
 		&resp.Code,

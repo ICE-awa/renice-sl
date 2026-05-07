@@ -69,6 +69,14 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 		return
 	}
 
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		httputil.BadRequest(c, "Invalid id")
+		return
+	}
+
+	req.ID = int64(id)
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.UpdateLink(c.Request.Context(), &req); err != nil {
@@ -88,7 +96,9 @@ func (h *LinkHandler) GetLinkByID(c *gin.Context) {
 		return
 	}
 
-	link, err := h.svc.GetLinkByID(c.Request.Context(), int64(id))
+	userID := c.GetInt64("user_id")
+
+	link, err := h.svc.GetLinkByID(c.Request.Context(), int64(id), userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")

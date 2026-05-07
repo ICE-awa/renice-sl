@@ -54,11 +54,13 @@ export default function CreateLinkDialog({
       form.setError("original_url", { message: "请输入原链接" });
       return;
     }
-    await onSubmit({
-      original_url: data.original_url.trim(),
-      expires_at: data.expires_at,
-    });
-    onOpenChange(false);
+    try {
+      await onSubmit({
+        original_url: data.original_url.trim(),
+        expires_at: data.expires_at,
+      });
+      onOpenChange(false);
+    } catch {}
   }
 
   return (

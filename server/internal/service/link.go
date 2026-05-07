@@ -12,7 +12,7 @@ type LinkService interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) error
 	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
-	GetLinkByID(context.Context, int64) (*dtov1.LinkItem, error)
+	GetLinkByID(context.Context, int64, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
 	Redirect(context.Context, string) (string, error)
 	GetStats(context.Context, int64) (*dtov1.GetStatsResponse, error)
@@ -57,8 +57,8 @@ func (s *linkService) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) er
 	return s.repo.UpdateLink(c, req)
 }
 
-func (s *linkService) GetLinkByID(c context.Context, id int64) (*dtov1.LinkItem, error) {
-	link, err := s.repo.GetLinkByID(c, id)
+func (s *linkService) GetLinkByID(c context.Context, id int64, userID int64) (*dtov1.LinkItem, error) {
+	link, err := s.repo.GetLinkByID(c, id, userID)
 	if err != nil {
 		return nil, err
 	}

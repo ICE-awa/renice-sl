@@ -66,8 +66,16 @@ export default function DashboardClient() {
       //   };
       //   await handleSearch(params);
       setCreateOpen(false);
-      await onRefreshTable(searchParams);
       toast.success("新建短链接成功");
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "服务器打了个盹，请稍后再试";
+      toast.error(message);
+      throw err;
+    }
+
+    try {
+      await onRefreshTable(searchParams);
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "服务器打了个盹，请稍后再试";
@@ -119,8 +127,16 @@ export default function DashboardClient() {
           : undefined,
         status: values.enabled ? "active" : "inactive",
       });
-      await onRefreshTable(searchParams);
       toast.success("成功更新链接信息");
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "服务器打了个盹，请稍后再试";
+      toast.error(message);
+      throw err;
+    }
+
+    try {
+      await onRefreshTable(searchParams);
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "服务器打了个盹，请稍后再试";
