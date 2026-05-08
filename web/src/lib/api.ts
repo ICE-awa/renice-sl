@@ -55,10 +55,7 @@ export async function apiFetch<T>(
   const body = (await res.json()) as ApiResponse<T>;
 
   if (res.status === 401 && !init?.skipAuthRefresh) {
-    await apiFetch("/api/v1/auth/refresh", {
-      method: "POST",
-      skipAuthRefresh: true,
-    });
+    await refreshAccessToken();
 
     return apiFetch<T>(path, {
       ...init,

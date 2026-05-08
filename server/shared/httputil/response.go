@@ -66,3 +66,7 @@ func InternalServerError(c *gin.Context, msg string) {
 func ServiceUnavailable(c *gin.Context, msg string) {
 	Fail(c, http.StatusServiceUnavailable, consts.CodeServiceUnavailable, msg)
 }
+
+func Redirect(c *gin.Context, httpStatus int, url string) {
+	c.Redirect(httpStatus, url)
+}

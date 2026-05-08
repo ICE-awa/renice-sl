@@ -18,6 +18,9 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			v1.POST("/auth/register", h.AuthHV1.Register)
 			v1.POST("/auth/login", h.AuthHV1.Login)
 			v1.POST("/auth/refresh", h.AuthHV1.Refresh)
+
+			// link
+			v1.GET("/s/:code", h.LinkHV1.Redirect)
 		}
 	}
 
@@ -29,6 +32,16 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			// auth
 			v1.POST("/auth/logout", h.AuthHV1.Logout)
 			v1.GET("/auth/me", h.AuthHV1.Me)
+
+			// link
+			v1.GET("/links", h.LinkHV1.GetLinks)
+			v1.GET("/link/:id", h.LinkHV1.GetLinkByID)
+			v1.POST("/link", h.LinkHV1.CreateLink)
+			v1.PUT("/link/:id", h.LinkHV1.UpdateLink)
+			v1.DELETE("/link/:id", h.LinkHV1.DeleteLink)
+
+			// stats
+			v1.GET("/stats", h.LinkHV1.GetStats)
 		}
 	}
 

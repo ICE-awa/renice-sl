@@ -9,18 +9,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LinkItem } from "../types";
+import { cn } from "@/lib/utils";
 
 type LinkTableProps = {
   items: LinkItem[];
-  onEdit?: (link: LinkItem) => void;
-  onDisable?: (link: LinkItem) => void;
-  onDelete?: (link: LinkItem) => void;
+  onEdit: (link: LinkItem) => void;
+  onStatusChange: (id: number, status: "active" | "inactive") => void;
+  onDelete: (link: LinkItem) => void;
 };
+
+const NEXT_PUBLIC_LINK_BASE_URL =
+  process.env.NEXT_PUBLIC_LINK_BASE_URL ?? "https://renice.cc/s/";
 
 export default function LinkTable({
   items,
   onEdit,
-  onDisable,
+  onStatusChange,
   onDelete,
 }: LinkTableProps) {
   return (
@@ -36,16 +40,19 @@ export default function LinkTable({
           <TableHead className="w-[10%]">
             <span className="block truncate">浏览量</span>
           </TableHead>
-          <TableHead className="w-[13%]">
+          <TableHead className="w-[10%]">
+            <span className="block truncate">短链接状态</span>
+          </TableHead>
+          <TableHead className="w-[10%]">
             <span className="block truncate">创建时间</span>
           </TableHead>
-          <TableHead className="w-[13%]">
+          <TableHead className="w-[10%]">
             <span className="block truncate">上次更新时间</span>
           </TableHead>
-          <TableHead className="w-[13%]">
+          <TableHead className="w-[10%]">
             <span className="block truncate">到期时间</span>
           </TableHead>
-          <TableHead className="w-[11%]">
+          <TableHead className="w-[10%]">
             <span className="block truncate">操作</span>
           </TableHead>
         </TableRow>
@@ -55,28 +62,48 @@ export default function LinkTable({
         {items.map((item) => (
           <TableRow key={item.id}>
             <TableCell>
-              <span className="block truncate">{item.originalUrl}</span>
+              <span className="block truncate">{item.original_url}</span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.shortUrl}</span>
+              <span
+                className={cn(
+                  "block truncate",
+                  item.status === "inactive" && "line-through",
+                )}
+              >
+                {NEXT_PUBLIC_LINK_BASE_URL + item.code}
+              </span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.viewCount}</span>
+              <span className="block truncate">{item.view_count}</span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.createdAt}</span>
+              <span
+                className={cn(
+                  "block truncate",
+                  item.status === "inactive" && "text-red-500",
+                )}
+              >
+                {item.status === "active" ? "启用" : "禁用"}
+              </span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.updatedAt}</span>
+              <span className="block truncate">{item.created_at}</span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.expiresAt}</span>
+              <span className="block truncate">{item.updated_at}</span>
+            </TableCell>
+            <TableCell>
+              <span className="block truncate">
+                {!!item.expires_at ? item.expires_at : "永不过期"}
+              </span>
             </TableCell>
             <TableCell>
               <LinkRowActions
                 onEdit={() => onEdit?.(item)}
-                onDisable={() => onDisable?.(item)}
+                onStatusChange={() => onStatusChange?.(item.id, item.status)}
                 onDelete={() => onDelete?.(item)}
+                itemStatus={item.status}
               />
             </TableCell>
           </TableRow>

@@ -56,12 +56,15 @@ func main() {
 	port := fmt.Sprintf(":%d", cfg.Server.Port)
 
 	authRepo := repository.NewUserRepository(db)
+	linkRepo := repository.NewLinkRepository(db)
 
 	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
+	linkSvc := service.NewLinkService(linkRepo)
 
 	h := &handler.Handlers{
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
 		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
+		LinkHV1: handlerv1.NewLinkHandler(linkSvc),
 	}
 
 	r := router.Setup(h, &cfg.Jwt)

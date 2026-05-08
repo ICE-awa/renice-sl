@@ -18,6 +18,7 @@ import { login } from "../api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { scheduleRefresh } from "../../protected/components/session";
+import { ApiError } from "@/lib/api";
 
 export function LoginForm() {
   const router = useRouter();
@@ -37,11 +38,12 @@ export function LoginForm() {
       toast.success("登录成功");
       router.push("/dashboard");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "登录失败";
+      const message = err instanceof ApiError ? err.message : "登录失败";
       form.setError("root", { message });
       toast.error(message);
     }
   }
+  // TODO 如果登录过了，则直接跳转到 dashboard
 
   return (
     <Card className="w-full max-w-sm">
