@@ -4,6 +4,7 @@ export const createLinkSchema = z
   .object({
     original_url: z.url("请输入有效的链接"),
     expires_at: z.date().optional(),
+    no_expires: z.boolean(),
   })
   .refine(
     (data) => {
@@ -24,6 +25,7 @@ export const updateLinkSchema = z
     original_url: z.url("请输入有效的链接").optional(),
     expires_at: z.date().optional(),
     enabled: z.boolean(),
+    no_expires: z.boolean(),
   })
   .refine(
     (data) => {

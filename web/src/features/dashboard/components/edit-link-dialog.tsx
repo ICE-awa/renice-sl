@@ -48,6 +48,7 @@ export default function EditLinkDialog({
       original_url: "",
       expires_at: undefined,
       enabled: true,
+      no_expires: false,
     },
   });
 
@@ -62,6 +63,7 @@ export default function EditLinkDialog({
         original_url: data.original_url?.trim(),
         expires_at: data.expires_at,
         enabled: data.enabled,
+        no_expires: data.expires_at === undefined ? true : false,
       });
       onOpenChange(false);
     } catch {}
@@ -71,11 +73,11 @@ export default function EditLinkDialog({
     if (item === null) {
       return;
     }
-    console.log(item);
     form.reset({
       original_url: item.original_url,
       expires_at: item.expires_at ? new Date(item.expires_at) : undefined,
       enabled: item.status === "active" ? true : false,
+      no_expires: item.expires_at ? false : true,
     });
   }, [item, form]);
 
@@ -128,7 +130,16 @@ export default function EditLinkDialog({
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                          field.onChange(date);
+
+                          if (date) {
+                            form.setValue("no_expires", false, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
@@ -145,6 +156,29 @@ export default function EditLinkDialog({
                   <Switch
                     checked={field.value}
                     onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
+
+            <Field data-invalid={!!form.formState.errors.no_expires}>
+              <FieldLabel htmlFor="no_expires">永不过期</FieldLabel>
+              <Controller
+                control={form.control}
+                name="no_expires"
+                render={({ field }) => (
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked);
+
+                      if (checked) {
+                        form.setValue("expires_at", undefined, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
                   />
                 )}
               />

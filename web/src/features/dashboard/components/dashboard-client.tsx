@@ -57,9 +57,13 @@ export default function DashboardClient() {
   async function handleCreate({
     original_url,
     expires_at,
+    no_expires,
   }: CreateLinkFormValues) {
     try {
-      await createLink({ original_url, expires_at: expires_at?.toISOString() });
+      await createLink({
+        original_url,
+        expires_at: no_expires ? undefined : expires_at?.toISOString(),
+      });
       //   const params: GetLinksInput = {
       //     page_num: 1,
       //     page_size: 10,

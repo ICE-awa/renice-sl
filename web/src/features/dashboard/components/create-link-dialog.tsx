@@ -26,6 +26,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 
 type CreateLinkDialogProps = {
   open: boolean;
@@ -33,6 +34,7 @@ type CreateLinkDialogProps = {
   onSubmit: (values: {
     original_url: string;
     expires_at?: Date;
+    no_expires: boolean;
   }) => Promise<void> | void;
 };
 
@@ -46,6 +48,7 @@ export default function CreateLinkDialog({
     defaultValues: {
       original_url: "",
       expires_at: undefined,
+      no_expires: true,
     },
   });
 
@@ -58,6 +61,7 @@ export default function CreateLinkDialog({
       await onSubmit({
         original_url: data.original_url.trim(),
         expires_at: data.expires_at,
+        no_expires: data.no_expires,
       });
       onOpenChange(false);
     } catch {}
@@ -83,9 +87,7 @@ export default function CreateLinkDialog({
             </Field>
 
             <Field data-invalid={!!form.formState.errors.expires_at}>
-              <FieldLabel htmlFor="expires_at">
-                请选择过期时间（留空表示永不过期）
-              </FieldLabel>
+              <FieldLabel htmlFor="expires_at">请选择过期时间</FieldLabel>
               <Controller
                 control={form.control}
                 name="expires_at"
@@ -110,10 +112,42 @@ export default function CreateLinkDialog({
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                          field.onChange(date);
+
+                          if (date) {
+                            form.setValue("no_expires", false, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
+                )}
+              />
+            </Field>
+
+            <Field data-invalid={!!form.formState.errors.no_expires}>
+              <FieldLabel htmlFor="no_expires">永不过期</FieldLabel>
+              <Controller
+                control={form.control}
+                name="no_expires"
+                render={({ field }) => (
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked);
+
+                      if (checked) {
+                        form.setValue("expires_at", undefined, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                  />
                 )}
               />
             </Field>

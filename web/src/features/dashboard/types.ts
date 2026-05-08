@@ -19,6 +19,7 @@ export type SidebarItems = {
 export type CreateLinkFormValues = {
   original_url: string;
   expires_at?: Date;
+  no_expires: boolean;
 };
 
 export type CreateLinkInput = {
@@ -41,6 +42,7 @@ export type UpdateLinkFormValues = {
   original_url?: string;
   expires_at?: Date;
   enabled: boolean;
+  no_expires: boolean;
 };
 
 export type UpdateLinkInput = {
