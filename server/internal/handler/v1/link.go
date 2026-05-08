@@ -80,6 +80,10 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.UpdateLink(c.Request.Context(), &req); err != nil {
+		if errors.Is(err, consts.ErrNoRowsAffected) {
+			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
+			return
+		}
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -126,6 +130,10 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.DeleteLink(c.Request.Context(), &req); err != nil {
+		if errors.Is(err, consts.ErrNoRowsAffected) {
+			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
+			return
+		}
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}

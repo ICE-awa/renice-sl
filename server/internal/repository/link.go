@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/model"
 	"github.com/jackc/pgx/v5"
@@ -183,8 +184,15 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	)
 	args = append(args, req.ID, req.UserID)
 
-	_, err := r.db.Exec(ctx, query, args...)
-	return err
+	rows, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	if rows.RowsAffected() == 0 {
+		return consts.ErrNoRowsAffected
+	}
+
+	return nil
 }
 
 func (r *linkRepository) GetLinkByID(c context.Context, id int64, userID int64) (*model.Link, error) {
@@ -224,8 +232,15 @@ func (r *linkRepository) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq)
 	query := `
 UPDATE links SET deleted_at = NOW() WHERE id = $1 AND user_id = $2`
 
-	_, err := r.db.Exec(ctx, query, req.ID, req.UserID)
-	return err
+	rows, err := r.db.Exec(ctx, query, req.ID, req.UserID)
+	if err != nil {
+		return err
+	}
+	if rows.RowsAffected() == 0 {
+		return consts.ErrNoRowsAffected
+	}
+
+	return nil
 }
 
 func (r *linkRepository) GetOriginalURLByCode(c context.Context, code string) (string, error) {
