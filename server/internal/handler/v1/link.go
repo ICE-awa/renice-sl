@@ -9,7 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"net/http"
+	"net/netip"
 	"strconv"
+	"time"
 )
 
 type LinkHandler struct {
@@ -143,8 +145,26 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 
 func (h *LinkHandler) Redirect(c *gin.Context) {
 	code := c.Param("code")
+	ipStr := c.ClientIP()
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
+		httputil.Fail(c, http.StatusInternalServerError, consts.CodeInternalServerError, "Failed to parse IP")
+		return
+	}
 
-	originalURL, err := h.svc.Redirect(c.Request.Context(), code)
+	ua := c.Request.UserAgent()
+	referer := c.Request.Referer()
+	clicked_at := time.Now()
+
+	req := &dtov1.ClickLinkReq{
+		Code:      code,
+		IP:        ip,
+		UserAgent: ua,
+		Referer:   referer,
+		ClickedAt: clicked_at,
+	}
+
+	originalURL, err := h.svc.Redirect(c.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")

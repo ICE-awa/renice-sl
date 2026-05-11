@@ -20,7 +20,7 @@ type LinkRepository interface {
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
 	GetOriginalURLByCode(context.Context, string) (string, error)
 	CheckCodeConflict(context.Context, string) (bool, error)
-	IncrementViewCount(context.Context, string) error
+	RecordClick(context.Context, *dtov1.ClickLinkReq) error
 	GetViewCountByUserID(context.Context, int64) (int64, error)
 	GetLinkCountByUserID(context.Context, int64) (int64, error)
 }
@@ -279,16 +279,38 @@ SELECT EXISTS (
 	return exists, nil
 }
 
-func (r *linkRepository) IncrementViewCount(c context.Context, code string) error {
+func (r *linkRepository) RecordClick(c context.Context, req *dtov1.ClickLinkReq) error {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
-	query := `
-UPDATE links SET view_count = view_count + 1 WHERE code = $1 AND deleted_at IS NULL
-`
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
-	_, err := r.db.Exec(ctx, query, code)
-	return err
+	updateQuery := `
+UPDATE links
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE code = $1
+	AND deleted_at IS NULL
+	AND status = 'active'
+`
+	_, err = tx.Exec(ctx, updateQuery, req.Code)
+	if err != nil {
+		return err
+	}
+
+	logQuery := `
+INSERT INTO click_log(code, ip, user_agent, referer, clicked_at)
+VALUES ($1, $2, $3, $4, $5)
+`
+	_, err = tx.Exec(ctx, logQuery, req.Code, req.IP, req.UserAgent, req.Referer, req.ClickedAt)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *linkRepository) GetViewCountByUserID(c context.Context, userID int64) (int64, error) {

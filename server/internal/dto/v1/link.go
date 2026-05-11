@@ -1,6 +1,9 @@
 package v1
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
 
 type CreateLinkReq struct {
 	UserID      int64      `json:"user_id"`
@@ -47,4 +50,12 @@ type DeleteLinkReq struct {
 type GetStatsResponse struct {
 	LinkCount int64 `json:"link_count"`
 	ViewCount int64 `json:"view_count"`
+}
+
+type ClickLinkReq struct {
+	Code      string     `json:"code"`
+	IP        netip.Addr `json:"ip"`
+	UserAgent string     `json:"user_agent"`
+	Referer   string     `json:"referer"`
+	ClickedAt time.Time  `json:"clicked_at"`
 }

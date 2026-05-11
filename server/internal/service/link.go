@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
+	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/util"
 )
@@ -14,16 +15,17 @@ type LinkService interface {
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
 	GetLinkByID(context.Context, int64, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
-	Redirect(context.Context, string) (string, error)
+	Redirect(context.Context, *dtov1.ClickLinkReq) (string, error)
 	GetStats(context.Context, int64) (*dtov1.GetStatsResponse, error)
 }
 
 type linkService struct {
-	repo repository.LinkRepository
+	repo      repository.LinkRepository
+	publisher *event.LinkPublisher
 }
 
-func NewLinkService(repo repository.LinkRepository) LinkService {
-	return &linkService{repo: repo}
+func NewLinkService(repo repository.LinkRepository, publisher *event.LinkPublisher) LinkService {
+	return &linkService{repo: repo, publisher: publisher}
 }
 
 func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) error {
@@ -80,15 +82,21 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 	return s.repo.DeleteLink(c, req)
 }
 
-func (s *linkService) Redirect(c context.Context, code string) (string, error) {
-	originalURL, err := s.repo.GetOriginalURLByCode(c, code)
+func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
+	originalURL, err := s.repo.GetOriginalURLByCode(c, req.Code)
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.repo.IncrementViewCount(c, code); err != nil {
+	if err := s.repo.RecordClick(c, req); err != nil {
 		return "", err
 	}
+
+	//if err := s.publisher.PublishLinkClicked(req); err != nil {
+	//	slog.Warn("failed to publish link clicked event",
+	//		slog.String("code", req.code),
+	//		slog.String("error", err.Error()))
+	//}
 
 	return originalURL, nil
 }
