@@ -58,4 +58,5 @@ type ClickLinkReq struct {
 	UserAgent string     `json:"user_agent"`
 	Referer   string     `json:"referer"`
 	ClickedAt time.Time  `json:"clicked_at"`
+	SkipStats bool       `json:"skip_stats"`
 }

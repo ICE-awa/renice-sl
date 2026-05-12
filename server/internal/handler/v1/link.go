@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -154,14 +155,15 @@ func (h *LinkHandler) Redirect(c *gin.Context) {
 
 	ua := c.Request.UserAgent()
 	referer := c.Request.Referer()
-	clicked_at := time.Now()
+	clickedAt := time.Now()
 
 	req := &dtov1.ClickLinkReq{
 		Code:      code,
 		IP:        ip,
 		UserAgent: ua,
 		Referer:   referer,
-		ClickedAt: clicked_at,
+		ClickedAt: clickedAt,
+		SkipStats: isBrowserPrefetch(c),
 	}
 
 	originalURL, err := h.svc.Redirect(c.Request.Context(), req)
@@ -187,4 +189,14 @@ func (h *LinkHandler) GetStats(c *gin.Context) {
 	}
 
 	httputil.OK(c, resp)
+}
+
+func isBrowserPrefetch(c *gin.Context) bool {
+	secPurpose := strings.ToLower(c.GetHeader("Sec-Purpose"))
+	purpose := strings.ToLower(c.GetHeader("Purpose"))
+
+	return strings.Contains(secPurpose, "prefetch") ||
+		strings.Contains(secPurpose, "prerender") ||
+		strings.Contains(purpose, "prefetch") ||
+		strings.Contains(purpose, "prerender")
 }

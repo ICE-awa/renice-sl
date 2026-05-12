@@ -12,6 +12,7 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Nats     NatsConfig     `mapstructure:"nats"`
 	Jwt      JwtConfig      `mapstructure:"jwt"`
+	Link     LinkConfig     `mapstructure:"link"`
 }
 
 type ServerConfig struct {
@@ -45,6 +46,10 @@ type JwtConfig struct {
 	RefreshSecret  string        `mapstructure:"refresh_token"`
 	AccessExpires  time.Duration `mapstructure:"access_expires"`
 	RefreshExpires time.Duration `mapstructure:"refresh_expires"`
+}
+
+type LinkConfig struct {
+	Expires time.Duration `mapstructure:"expires"`
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -83,6 +88,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("jwt.refresh_secret", "JWT_REFRESH_SECRET")
 	_ = v.BindEnv("jwt.access_expires", "JWT_ACCESS_EXPIRES")
 	_ = v.BindEnv("jwt.refresh_expires", "JWT_REFRESH_EXPIRES")
+	_ = v.BindEnv("link.expires", "LINK_EXPIRES")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

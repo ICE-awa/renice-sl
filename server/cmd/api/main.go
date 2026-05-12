@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/handler"
 	handlerv1 "github.com/ICE-awa/renice-sl/internal/handler/v1"
 	"github.com/ICE-awa/renice-sl/internal/repository"
@@ -17,6 +18,7 @@ import (
 )
 
 func main() {
+	// config
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("Error loading config",
@@ -28,6 +30,7 @@ func main() {
 
 	ctx := context.Background()
 
+	// postgres
 	db, err := database.NewPool(ctx, cfg.Database)
 	if err != nil {
 		slog.Error("Error initializing postgresql",
@@ -35,6 +38,7 @@ func main() {
 	}
 	defer db.Close()
 
+	// redis
 	rdb, err := cache.NewRedis(ctx, cfg.Redis)
 	if err != nil {
 		slog.Error("Error initializing redis",
@@ -42,6 +46,7 @@ func main() {
 	}
 	defer rdb.Close()
 
+	// nats
 	natsClient, err := mq.NewNatsClient(cfg.Nats)
 	if err != nil {
 		slog.Error("Error initializing NATS",
@@ -49,17 +54,26 @@ func main() {
 	}
 	defer natsClient.Close()
 
+	// jetstream
+	err = mq.EnsureStream(natsClient)
+	if err != nil {
+		slog.Error("Error initializing JetStream",
+			slog.String("error", err.Error()))
+	}
+
 	slog.Info("Server Started",
 		slog.Int("port", cfg.Server.Port),
 		slog.String("mode", cfg.Server.Mode))
 
 	port := fmt.Sprintf(":%d", cfg.Server.Port)
 
+	linkPublisher := event.NewLinkPublisher(natsClient)
+
 	authRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
 
 	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
-	linkSvc := service.NewLinkService(linkRepo)
+	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link)
 
 	h := &handler.Handlers{
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
@@ -69,6 +83,15 @@ func main() {
 
 	r := router.Setup(h, &cfg.Jwt)
 
+	err = r.SetTrustedProxies([]string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	if err := r.Run(port); err != nil {
 		slog.Error("Error occurred while server starting",
 			slog.Int("port", cfg.Server.Port),
@@ -77,3 +100,34 @@ func main() {
 	}
 
 }
+
+//func startPGPoolStatsLogger(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
+//	ticker := time.NewTicker(interval)
+//
+//	go func() {
+//		defer ticker.Stop()
+//
+//		for {
+//			select {
+//			case <-ctx.Done():
+//				return
+//
+//			case <-ticker.C:
+//				s := pool.Stat()
+//
+//				log.Printf(
+//					"pgpool max=%d total=%d acquired=%d idle=%d constructing=%d acquire_count=%d empty_acquire=%d acquire_duration=%s canceled_acquire=%d",
+//					s.MaxConns(),
+//					s.TotalConns(),
+//					s.AcquiredConns(),
+//					s.IdleConns(),
+//					s.ConstructingConns(),
+//					s.AcquireCount(),
+//					s.EmptyAcquireCount(),
+//					s.AcquireDuration(),
+//					s.CanceledAcquireCount(),
+//				)
+//			}
+//		}
+//	}()
+//}

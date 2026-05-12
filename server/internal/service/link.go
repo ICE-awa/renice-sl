@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/repository"
+	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/util"
+	"github.com/redis/go-redis/v9"
+	"log/slog"
 )
 
 type LinkService interface {
@@ -22,10 +26,22 @@ type LinkService interface {
 type linkService struct {
 	repo      repository.LinkRepository
 	publisher *event.LinkPublisher
+	rdb       *redis.Client
+	cfg       *config.LinkConfig
 }
 
-func NewLinkService(repo repository.LinkRepository, publisher *event.LinkPublisher) LinkService {
-	return &linkService{repo: repo, publisher: publisher}
+func NewLinkService(
+	repo repository.LinkRepository,
+	publisher *event.LinkPublisher,
+	rdb *redis.Client,
+	cfg *config.LinkConfig,
+) LinkService {
+	return &linkService{
+		repo:      repo,
+		publisher: publisher,
+		rdb:       rdb,
+		cfg:       cfg,
+	}
 }
 
 func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) error {
@@ -83,21 +99,34 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 }
 
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
-	originalURL, err := s.repo.GetOriginalURLByCode(c, req.Code)
-	if err != nil {
+
+	key := consts.RedisLinkCodeKey + req.Code
+	link, err := s.rdb.Get(c, key).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", err
+	}
+	var originalURL string
+	if link != "" {
+		originalURL = link
+	} else {
+		originalURL, err = s.repo.GetOriginalURLByCode(c, req.Code)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if err := s.rdb.Set(c, key, originalURL, s.cfg.Expires).Err(); err != nil {
 		return "", err
 	}
 
-	if err := s.repo.RecordClick(c, req); err != nil {
-		return "", err
+	if !req.SkipStats {
+		if err := s.publisher.PublishLinkClicked(req); err != nil {
+			slog.Warn("failed to publish link clicked event",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+		}
 	}
-
-	//if err := s.publisher.PublishLinkClicked(req); err != nil {
-	//	slog.Warn("failed to publish link clicked event",
-	//		slog.String("code", req.code),
-	//		slog.String("error", err.Error()))
-	//}
-
+	
 	return originalURL, nil
 }
 
