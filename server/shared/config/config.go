@@ -49,7 +49,8 @@ type JwtConfig struct {
 }
 
 type LinkConfig struct {
-	Expires time.Duration `mapstructure:"expires"`
+	Expires     time.Duration `mapstructure:"expires"`
+	NullExpires time.Duration `mapstructure:"null_expires"`
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -89,6 +90,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("jwt.access_expires", "JWT_ACCESS_EXPIRES")
 	_ = v.BindEnv("jwt.refresh_expires", "JWT_REFRESH_EXPIRES")
 	_ = v.BindEnv("link.expires", "LINK_EXPIRES")
+	_ = v.BindEnv("link.null_expires", "LINK_NULL_EXPIRES")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

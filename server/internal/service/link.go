@@ -126,6 +126,7 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
 
+	// 判断对应 code 是否在 redis 中已经缓存
 	key := consts.RedisLinkCodeKey + req.Code
 	cache, err := s.rdb.Get(c, key).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
@@ -135,33 +136,57 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 	}
 	cacheMiss := err != nil
 
+	// 若缓存过了
 	var originalURL string
 	if !cacheMiss {
 		var data dtov1.LinkCache
 		if err := json.Unmarshal([]byte(cache), &data); err != nil {
+			// 尝试解析 若解析失败则判断为缓存失效
 			slog.Warn("failed to unmarshal cache",
 				slog.String("code", req.Code),
 				slog.String("error", err.Error()))
 			cacheMiss = true
 		} else {
-			originalURL = data.OriginalURL
-			if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+			// 若解析成功，则判断快照是否合法，若合法则继续，不合法则直接返回 ErrInvalidLink
+			if data.OriginalURL == consts.NullLink ||
+				data.Status == "inactive" ||
+				(data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
 				return "", consts.ErrInvalidLink
 			}
+			originalURL = data.OriginalURL
 		}
 	}
 
+	// 如果缓存没有命中
 	if cacheMiss {
 		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
 		if err != nil {
+			// 若为空链接
 			if errors.Is(err, pgx.ErrNoRows) {
+				nullLink := &dtov1.LinkCache{
+					OriginalURL: consts.NullLink,
+					Status:      "",
+					ExpiresAt:   nil,
+				}
+				// 尝试将此空链接缓存入 Redis 中
+				linkCache, err := json.Marshal(nullLink)
+				if err != nil {
+					slog.Warn("failed to marshal null cache",
+						slog.String("code", req.Code),
+						slog.String("error", err.Error()))
+				} else {
+					if err := s.rdb.Set(c, key, linkCache, s.cfg.NullExpires).Err(); err != nil {
+						slog.Warn("failed to cache null link in Redis",
+							slog.String("code", req.Code),
+							slog.String("error", err.Error()))
+					}
+				}
 				return "", consts.ErrInvalidLink
 			}
 			return "", err
 		}
-		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
-			return "", consts.ErrInvalidLink
-		}
+
+		// 若没有报错 无论如何先写入当前快照到 Redis 中 避免缓存穿透
 		originalURL = data.OriginalURL
 		linkCache, err := json.Marshal(data)
 		if err != nil {
@@ -175,8 +200,13 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 					slog.String("error", err.Error()))
 			}
 		}
+		// 随后判断其合法性，若不合法则不放行
+		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+			return "", consts.ErrInvalidLink
+		}
 	}
 
+	// 避免为浏览器 prefetch/prerender 写入浏览记录
 	if !req.SkipStats {
 		req.EventID = uuid.NewString()
 		if err := s.publisher.PublishLinkClicked(req); err != nil {
