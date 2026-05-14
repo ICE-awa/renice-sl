@@ -2,11 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strings"
 	"time"
@@ -15,12 +16,12 @@ import (
 type LinkRepository interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) (int64, error)
 	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
-	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
+	UpdateLink(context.Context, *dtov1.UpdateLinkReq) (string, error)
 	GetLinkByID(context.Context, int64, int64) (*model.Link, error)
-	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
-	GetOriginalURLByCode(context.Context, string) (string, error)
+	DeleteLink(context.Context, *dtov1.DeleteLinkReq) (string, error)
+	GetLinkCacheByCode(context.Context, string) (*dtov1.LinkCache, error)
 	CheckCodeConflict(context.Context, string) (bool, error)
-	IncrementViewCount(context.Context, string) error
+	RecordClick(context.Context, *dtov1.ClickLinkReq) error
 	GetViewCountByUserID(context.Context, int64) (int64, error)
 	GetLinkCountByUserID(context.Context, int64) (int64, error)
 }
@@ -158,7 +159,7 @@ LIMIT $%d OFFSET $%d
 	return links, nil
 }
 
-func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) error {
+func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) (string, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 	// UPDATE links SET xxx WHERE ID = xx AND user_id = xx
@@ -177,22 +178,20 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE links SET %s WHERE id = $%d AND user_id = $%d",
+		"UPDATE links SET %s WHERE id = $%d AND user_id = $%d AND deleted_at IS NULL RETURNING code",
 		strings.Join(setClauses, ", "),
 		argIndex,
 		argIndex+1,
 	)
 	args = append(args, req.ID, req.UserID)
 
-	rows, err := r.db.Exec(ctx, query, args...)
+	var code string
+	err := r.db.QueryRow(ctx, query, args...).Scan(&code)
 	if err != nil {
-		return err
-	}
-	if rows.RowsAffected() == 0 {
-		return consts.ErrNoRowsAffected
+		return "", err
 	}
 
-	return nil
+	return code, nil
 }
 
 func (r *linkRepository) GetLinkByID(c context.Context, id int64, userID int64) (*model.Link, error) {
@@ -225,38 +224,36 @@ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	return resp, nil
 }
 
-func (r *linkRepository) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) error {
+func (r *linkRepository) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) (string, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
 	query := `
-UPDATE links SET deleted_at = NOW() WHERE id = $1 AND user_id = $2`
+UPDATE links SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL RETURNING code`
 
-	rows, err := r.db.Exec(ctx, query, req.ID, req.UserID)
-	if err != nil {
-		return err
-	}
-	if rows.RowsAffected() == 0 {
-		return consts.ErrNoRowsAffected
-	}
-
-	return nil
-}
-
-func (r *linkRepository) GetOriginalURLByCode(c context.Context, code string) (string, error) {
-	ctx, cancel := context.WithTimeout(c, 5*time.Second)
-	defer cancel()
-
-	query := `
-SELECT original_url FROM links WHERE code = $1 AND deleted_at IS NULL AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
-
-	var originalURL string
-	err := r.db.QueryRow(ctx, query, code).Scan(&originalURL)
+	var code string
+	err := r.db.QueryRow(ctx, query, req.ID, req.UserID).Scan(&code)
 	if err != nil {
 		return "", err
 	}
 
-	return originalURL, nil
+	return code, nil
+}
+
+func (r *linkRepository) GetLinkCacheByCode(c context.Context, code string) (*dtov1.LinkCache, error) {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	query := `
+SELECT original_url, status, expires_at FROM links WHERE code = $1 AND deleted_at IS NULL`
+
+	var data dtov1.LinkCache
+	err := r.db.QueryRow(ctx, query, code).Scan(&data.OriginalURL, &data.Status, &data.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }
 
 func (r *linkRepository) CheckCodeConflict(c context.Context, code string) (bool, error) {
@@ -279,16 +276,42 @@ SELECT EXISTS (
 	return exists, nil
 }
 
-func (r *linkRepository) IncrementViewCount(c context.Context, code string) error {
+func (r *linkRepository) RecordClick(c context.Context, req *dtov1.ClickLinkReq) error {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
-	query := `
-UPDATE links SET view_count = view_count + 1 WHERE code = $1 AND deleted_at IS NULL
-`
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
-	_, err := r.db.Exec(ctx, query, code)
-	return err
+	logQuery := `
+INSERT INTO click_log(event_id, code, ip, user_agent, referer, clicked_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+	_, err = tx.Exec(ctx, logQuery, req.EventID, req.Code, req.IP, req.UserAgent, req.Referer, req.ClickedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil
+		}
+		return err
+	}
+
+	updateQuery := `
+UPDATE links
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE code = $1
+	AND deleted_at IS NULL
+	AND status = 'active'
+`
+	_, err = tx.Exec(ctx, updateQuery, req.Code)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *linkRepository) GetViewCountByUserID(c context.Context, userID int64) (int64, error) {

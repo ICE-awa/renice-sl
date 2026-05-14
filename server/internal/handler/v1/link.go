@@ -9,7 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"net/http"
+	"net/netip"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type LinkHandler struct {
@@ -80,7 +83,7 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.UpdateLink(c.Request.Context(), &req); err != nil {
-		if errors.Is(err, consts.ErrNoRowsAffected) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
@@ -130,7 +133,7 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.DeleteLink(c.Request.Context(), &req); err != nil {
-		if errors.Is(err, consts.ErrNoRowsAffected) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
@@ -143,10 +146,29 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 
 func (h *LinkHandler) Redirect(c *gin.Context) {
 	code := c.Param("code")
-
-	originalURL, err := h.svc.Redirect(c.Request.Context(), code)
+	ipStr := c.ClientIP()
+	ip, err := netip.ParseAddr(ipStr)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		httputil.Fail(c, http.StatusInternalServerError, consts.CodeInternalServerError, "Failed to parse IP")
+		return
+	}
+
+	ua := c.Request.UserAgent()
+	referer := c.Request.Referer()
+	clickedAt := time.Now()
+
+	req := &dtov1.ClickLinkReq{
+		Code:      code,
+		IP:        ip,
+		UserAgent: ua,
+		Referer:   referer,
+		ClickedAt: clickedAt,
+		SkipStats: isBrowserPrefetch(c),
+	}
+
+	originalURL, err := h.svc.Redirect(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, consts.ErrInvalidLink) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
@@ -167,4 +189,14 @@ func (h *LinkHandler) GetStats(c *gin.Context) {
 	}
 
 	httputil.OK(c, resp)
+}
+
+func isBrowserPrefetch(c *gin.Context) bool {
+	secPurpose := strings.ToLower(c.GetHeader("Sec-Purpose"))
+	purpose := strings.ToLower(c.GetHeader("Purpose"))
+
+	return strings.Contains(secPurpose, "prefetch") ||
+		strings.Contains(secPurpose, "prerender") ||
+		strings.Contains(purpose, "prefetch") ||
+		strings.Contains(purpose, "prerender")
 }

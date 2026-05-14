@@ -2,10 +2,19 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
+	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/repository"
+	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/util"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/redis/go-redis/v9"
+	"log/slog"
+	"time"
 )
 
 type LinkService interface {
@@ -14,16 +23,29 @@ type LinkService interface {
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
 	GetLinkByID(context.Context, int64, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
-	Redirect(context.Context, string) (string, error)
+	Redirect(context.Context, *dtov1.ClickLinkReq) (string, error)
 	GetStats(context.Context, int64) (*dtov1.GetStatsResponse, error)
 }
 
 type linkService struct {
-	repo repository.LinkRepository
+	repo      repository.LinkRepository
+	publisher *event.LinkPublisher
+	rdb       *redis.Client
+	cfg       *config.LinkConfig
 }
 
-func NewLinkService(repo repository.LinkRepository) LinkService {
-	return &linkService{repo: repo}
+func NewLinkService(
+	repo repository.LinkRepository,
+	publisher *event.LinkPublisher,
+	rdb *redis.Client,
+	cfg *config.LinkConfig,
+) LinkService {
+	return &linkService{
+		repo:      repo,
+		publisher: publisher,
+		rdb:       rdb,
+		cfg:       cfg,
+	}
 }
 
 func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) error {
@@ -54,7 +76,18 @@ func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dt
 }
 
 func (s *linkService) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) error {
-	return s.repo.UpdateLink(c, req)
+	code, err := s.repo.UpdateLink(c, req)
+	if err != nil {
+		return err
+	}
+
+	key := consts.RedisLinkCodeKey + code
+	if err := s.rdb.Del(c, key).Err(); err != nil {
+		slog.Warn("failed to delete cache in Redis after link update",
+			slog.String("code", code),
+			slog.String("error", err.Error()))
+	}
+	return nil
 }
 
 func (s *linkService) GetLinkByID(c context.Context, id int64, userID int64) (*dtov1.LinkItem, error) {
@@ -77,17 +110,80 @@ func (s *linkService) GetLinkByID(c context.Context, id int64, userID int64) (*d
 }
 
 func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) error {
-	return s.repo.DeleteLink(c, req)
-}
-
-func (s *linkService) Redirect(c context.Context, code string) (string, error) {
-	originalURL, err := s.repo.GetOriginalURLByCode(c, code)
+	code, err := s.repo.DeleteLink(c, req)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	if err := s.repo.IncrementViewCount(c, code); err != nil {
-		return "", err
+	key := consts.RedisLinkCodeKey + code
+	if err := s.rdb.Del(c, key).Err(); err != nil {
+		slog.Warn("failed to delete cache in Redis after link deletion",
+			slog.String("code", code),
+			slog.String("error", err.Error()))
+	}
+	return nil
+}
+
+func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
+
+	key := consts.RedisLinkCodeKey + req.Code
+	cache, err := s.rdb.Get(c, key).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		slog.Warn("failed to get original URL from Redis",
+			slog.String("code", req.Code),
+			slog.String("error", err.Error()))
+	}
+	cacheMiss := err != nil
+
+	var originalURL string
+	if !cacheMiss {
+		var data dtov1.LinkCache
+		if err := json.Unmarshal([]byte(cache), &data); err != nil {
+			slog.Warn("failed to unmarshal cache",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+			cacheMiss = true
+		} else {
+			originalURL = data.OriginalURL
+			if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+				return "", consts.ErrInvalidLink
+			}
+		}
+	}
+
+	if cacheMiss {
+		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", consts.ErrInvalidLink
+			}
+			return "", err
+		}
+		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+			return "", consts.ErrInvalidLink
+		}
+		originalURL = data.OriginalURL
+		linkCache, err := json.Marshal(data)
+		if err != nil {
+			slog.Warn("failed to marshal cache",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+		} else {
+			if err := s.rdb.Set(c, key, linkCache, s.cfg.Expires).Err(); err != nil {
+				slog.Warn("failed to cache original URL in Redis",
+					slog.String("code", req.Code),
+					slog.String("error", err.Error()))
+			}
+		}
+	}
+
+	if !req.SkipStats {
+		req.EventID = uuid.NewString()
+		if err := s.publisher.PublishLinkClicked(req); err != nil {
+			slog.Warn("failed to publish link clicked event",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+		}
 	}
 
 	return originalURL, nil
