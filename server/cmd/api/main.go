@@ -15,6 +15,7 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/logger"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"log/slog"
+	"os"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 	if err != nil {
 		slog.Error("Error loading config",
 			slog.String("error", err.Error()))
-		return
+		os.Exit(1)
 	}
 
 	logger.Init(cfg.Server.Mode)
@@ -35,6 +36,7 @@ func main() {
 	if err != nil {
 		slog.Error("Error initializing postgresql",
 			slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -43,6 +45,7 @@ func main() {
 	if err != nil {
 		slog.Error("Error initializing redis",
 			slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	defer rdb.Close()
 
@@ -51,6 +54,7 @@ func main() {
 	if err != nil {
 		slog.Error("Error initializing NATS",
 			slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	defer natsClient.Close()
 
@@ -59,6 +63,7 @@ func main() {
 	if err != nil {
 		slog.Error("Error initializing JetStream",
 			slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	slog.Info("Server Started",

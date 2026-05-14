@@ -53,10 +53,17 @@ type GetStatsResponse struct {
 }
 
 type ClickLinkReq struct {
+	EventID   string     `json:"event_id"`
 	Code      string     `json:"code"`
 	IP        netip.Addr `json:"ip"`
 	UserAgent string     `json:"user_agent"`
 	Referer   string     `json:"referer"`
 	ClickedAt time.Time  `json:"clicked_at"`
 	SkipStats bool       `json:"skip_stats"`
+}
+
+type LinkCache struct {
+	OriginalURL string     `json:"original_url"`
+	Status      string     `json:"status"`
+	ExpiresAt   *time.Time `json:"expires_at"`
 }

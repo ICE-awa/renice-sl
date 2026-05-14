@@ -16,7 +16,7 @@ func EnsureStream(client *NatsClient) error {
 	_, err = client.JetStream.AddStream(&nats.StreamConfig{
 		Name:     StreamLinkEvents,
 		Subjects: []string{SubjectLinkAll},
-		Storage:  nats.MemoryStorage,
+		Storage:  nats.FileStorage,
 	})
 
 	return err

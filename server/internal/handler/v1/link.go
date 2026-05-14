@@ -83,7 +83,7 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.UpdateLink(c.Request.Context(), &req); err != nil {
-		if errors.Is(err, consts.ErrNoRowsAffected) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
@@ -133,7 +133,7 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 	req.UserID = c.GetInt64("user_id")
 
 	if err := h.svc.DeleteLink(c.Request.Context(), &req); err != nil {
-		if errors.Is(err, consts.ErrNoRowsAffected) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
@@ -168,7 +168,7 @@ func (h *LinkHandler) Redirect(c *gin.Context) {
 
 	originalURL, err := h.svc.Redirect(c.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, consts.ErrInvalidLink) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
