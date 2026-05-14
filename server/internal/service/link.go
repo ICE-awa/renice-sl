@@ -11,6 +11,7 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/util"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 	"log/slog"
 	"time"
@@ -132,7 +133,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 			slog.String("code", req.Code),
 			slog.String("error", err.Error()))
 	}
-	cacheMiss := errors.Is(err, redis.Nil)
+	cacheMiss := err != nil
 
 	var originalURL string
 	if !cacheMiss {
@@ -141,15 +142,22 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 			slog.Warn("failed to unmarshal cache",
 				slog.String("code", req.Code),
 				slog.String("error", err.Error()))
+			cacheMiss = true
+		} else {
+			originalURL = data.OriginalURL
+			if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+				return "", consts.ErrInvalidLink
+			}
 		}
-		originalURL = data.OriginalURL
-		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
-			return "", consts.ErrInvalidLink
-		}
-	} else {
+	}
+
+	if cacheMiss {
 		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
 		if err != nil {
-			return "", consts.ErrInvalidLink
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", consts.ErrInvalidLink
+			}
+			return "", err
 		}
 		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
 			return "", consts.ErrInvalidLink

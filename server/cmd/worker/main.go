@@ -37,12 +37,12 @@ func main() {
 
 	// nats
 	natsClient, err := mq.NewNatsClient(cfg.Nats)
-	defer natsClient.Close()
 	if err != nil {
 		slog.Error("Failed to connect to NATS",
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+	defer natsClient.Close()
 
 	// jetStream
 	err = mq.EnsureStream(natsClient)

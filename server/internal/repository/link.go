@@ -178,7 +178,7 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE links SET %s WHERE id = $%d AND user_id = $%d RETURNING code",
+		"UPDATE links SET %s WHERE id = $%d AND user_id = $%d AND deleted_at IS NULL RETURNING code",
 		strings.Join(setClauses, ", "),
 		argIndex,
 		argIndex+1,
@@ -229,7 +229,7 @@ func (r *linkRepository) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq)
 	defer cancel()
 
 	query := `
-UPDATE links SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING code`
+UPDATE links SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL RETURNING code`
 
 	var code string
 	err := r.db.QueryRow(ctx, query, req.ID, req.UserID).Scan(&code)
