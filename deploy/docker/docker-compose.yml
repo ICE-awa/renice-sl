@@ -42,7 +42,7 @@ services:
     ports:
       - "58001:5432"
     volumes:
-      - ./data/pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "sh -c 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_DBNAME}'"]
       interval: 5s
@@ -66,7 +66,7 @@ services:
     container_name: renice-nats
     command: ["-js", "-sd", "/data", "-m", "8222"]
     volumes:
-      - ./data/nats_data:/data
+      - nats_data:/data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz"]
       interval: 5s
