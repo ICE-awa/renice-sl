@@ -66,6 +66,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 布隆过滤器
+	bloom := cache.NewBloomFilter(100_000, 0.01)
+
 	slog.Info("Server Started",
 		slog.Int("port", cfg.Server.Port),
 		slog.String("mode", cfg.Server.Mode))
@@ -78,7 +81,15 @@ func main() {
 	linkRepo := repository.NewLinkRepository(db)
 
 	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
-	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link)
+	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link, bloom)
+
+	// 布隆过滤器初始化
+	err = linkSvc.InitBloomFilter()
+	if err != nil {
+		slog.Error("Error initializing Bloom Filter",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 
 	h := &handler.Handlers{
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),

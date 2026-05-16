@@ -8,6 +8,7 @@ import (
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/repository"
+	"github.com/ICE-awa/renice-sl/shared/cache"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/util"
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ type LinkService interface {
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
 	Redirect(context.Context, *dtov1.ClickLinkReq) (string, error)
 	GetStats(context.Context, int64) (*dtov1.GetStatsResponse, error)
+	InitBloomFilter() error
 }
 
 type linkService struct {
@@ -32,6 +34,7 @@ type linkService struct {
 	publisher *event.LinkPublisher
 	rdb       *redis.Client
 	cfg       *config.LinkConfig
+	bloom     *cache.BloomFilter
 }
 
 func NewLinkService(
@@ -39,12 +42,14 @@ func NewLinkService(
 	publisher *event.LinkPublisher,
 	rdb *redis.Client,
 	cfg *config.LinkConfig,
+	bloom *cache.BloomFilter,
 ) LinkService {
 	return &linkService{
 		repo:      repo,
 		publisher: publisher,
 		rdb:       rdb,
 		cfg:       cfg,
+		bloom:     bloom,
 	}
 }
 
@@ -68,7 +73,13 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 	}
 
 	_, err := s.repo.CreateLink(c, req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 将 code 添加至布隆过滤器中
+	s.bloom.Add(req.Code)
+	return nil
 }
 
 func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error) {
@@ -125,7 +136,12 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 }
 
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
+	// 判断 code 是否一定不存在
+	if !s.bloom.MayContain(req.Code) {
+		return "", consts.ErrInvalidLink
+	}
 
+	// 如果 code 可能存在 则继续往下走
 	// 判断对应 code 是否在 redis 中已经缓存
 	key := consts.RedisLinkCodeKey + req.Code
 	cache, err := s.rdb.Get(c, key).Result()
@@ -236,4 +252,18 @@ func (s *linkService) GetStats(c context.Context, userID int64) (*dtov1.GetStats
 	}
 
 	return resp, nil
+}
+
+func (s *linkService) InitBloomFilter() error {
+	c := context.Background()
+	codes, err := s.repo.GetAllLinkCodes(c)
+	if err != nil {
+		return err
+	}
+
+	for _, code := range codes {
+		s.bloom.Add(code)
+	}
+
+	return nil
 }
