@@ -24,6 +24,7 @@ type LinkRepository interface {
 	RecordClick(context.Context, *dtov1.ClickLinkReq) error
 	GetViewCountByUserID(context.Context, int64) (int64, error)
 	GetLinkCountByUserID(context.Context, int64) (int64, error)
+	GetAllLinkCodes(context.Context) ([]string, error)
 }
 type linkRepository struct {
 	db *pgxpool.Pool
@@ -350,4 +351,34 @@ WHERE user_id = $1 AND deleted_at IS NULL
 	}
 
 	return total, nil
+}
+
+func (r *linkRepository) GetAllLinkCodes(c context.Context) ([]string, error) {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	query := `
+SELECT code FROM links WHERE deleted_at IS NULL
+`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	codes, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var code string
+
+		err := row.Scan(&code)
+		if err != nil {
+			return "", err
+		}
+
+		return code, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return codes, nil
 }
