@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 	"log/slog"
+	"math/rand"
 	"time"
 )
 
@@ -110,7 +111,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 						slog.String("code", req.Code),
 						slog.String("error", err.Error()))
 				} else {
-					if err := s.rdb.Set(c, key, linkCache, s.cfg.NullExpires).Err(); err != nil {
+					if err := s.rdb.Set(c, key, linkCache, s.randomTTL(s.cfg.NullExpires, 15*time.Second)).Err(); err != nil {
 						slog.Warn("failed to cache null link in Redis in cacheFillGroup",
 							slog.String("code", req.Code),
 							slog.String("error", err.Error()))
@@ -128,7 +129,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 				slog.String("code", req.Code),
 				slog.String("error", err.Error()))
 		} else {
-			if err := s.rdb.Set(c, key, linkCache, s.cfg.Expires).Err(); err != nil {
+			if err := s.rdb.Set(c, key, linkCache, s.randomTTL(s.cfg.Expires, 5*time.Minute)).Err(); err != nil {
 				slog.Warn("failed to cache original URL in Redis in cacheFillGroup",
 					slog.String("code", req.Code),
 					slog.String("error", err.Error()))
@@ -154,6 +155,13 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 	}
 
 	return data, nil
+}
+
+func (s *linkService) randomTTL(base time.Duration, jitter time.Duration) time.Duration {
+	if jitter <= 0 {
+		return base
+	}
+	return base + time.Duration(rand.Int63n(int64(jitter)))
 }
 
 func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) error {
