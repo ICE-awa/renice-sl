@@ -5,9 +5,10 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/middleware"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
+func Setup(h *handler.Handlers, cfg *config.JwtConfig, rdb *redis.Client) *gin.Engine {
 	r := gin.New()
 
 	public := r.Group("/api")
@@ -15,8 +16,8 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 		v1 := public.Group("/v1")
 		{
 			// auth
-			v1.POST("/auth/register", h.AuthHV1.Register)
-			v1.POST("/auth/login", h.AuthHV1.Login)
+			v1.POST("/auth/register", middleware.RateLimitByIP(rdb), h.AuthHV1.Register)
+			v1.POST("/auth/login", middleware.RateLimitByIP(rdb), h.AuthHV1.Login)
 			v1.POST("/auth/refresh", h.AuthHV1.Refresh)
 
 			// link
@@ -36,7 +37,7 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig) *gin.Engine {
 			// link
 			v1.GET("/links", h.LinkHV1.GetLinks)
 			v1.GET("/link/:id", h.LinkHV1.GetLinkByID)
-			v1.POST("/link", h.LinkHV1.CreateLink)
+			v1.POST("/link", middleware.RateLimitByUserID(rdb), h.LinkHV1.CreateLink)
 			v1.PUT("/link/:id", h.LinkHV1.UpdateLink)
 			v1.DELETE("/link/:id", h.LinkHV1.DeleteLink)
 

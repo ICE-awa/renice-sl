@@ -15,6 +15,8 @@ const (
 	CodeLinkNotFound         = 404002
 	CodeConflict             = 409000
 	CodeParamConflict        = 409001
+	CodeTooManyRequest       = 429000
+	CodeRateLimitExceeded    = 429001
 	CodeInternalServerError  = 500000
 	CodeFailedToGenerateCode = 500001
 	CodeFailedToRedirect     = 500002

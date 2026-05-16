@@ -97,7 +97,7 @@ func main() {
 		LinkHV1: handlerv1.NewLinkHandler(linkSvc),
 	}
 
-	r := router.Setup(h, &cfg.Jwt)
+	r := router.Setup(h, &cfg.Jwt, rdb)
 
 	err = r.SetTrustedProxies([]string{
 		"10.0.0.0/8",
