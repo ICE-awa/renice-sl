@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/singleflight"
 	"log/slog"
 	"time"
 )
@@ -30,11 +31,12 @@ type LinkService interface {
 }
 
 type linkService struct {
-	repo      repository.LinkRepository
-	publisher *event.LinkPublisher
-	rdb       *redis.Client
-	cfg       *config.LinkConfig
-	bloom     *cache.BloomFilter
+	repo           repository.LinkRepository
+	publisher      *event.LinkPublisher
+	rdb            *redis.Client
+	cfg            *config.LinkConfig
+	bloom          *cache.BloomFilter
+	cacheFillGroup singleflight.Group
 }
 
 func NewLinkService(
@@ -51,6 +53,107 @@ func NewLinkService(
 		cfg:       cfg,
 		bloom:     bloom,
 	}
+}
+
+func (s *linkService) validateLinkCache(data *dtov1.LinkCache) bool {
+	if data.OriginalURL == consts.NullLink ||
+		data.Status == "inactive" ||
+		(data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+		return false
+	}
+	return true
+}
+
+func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dtov1.LinkCache, error) {
+	c, cancel := context.WithTimeout(c, 3*time.Second)
+	defer cancel()
+
+	value, err, _ := s.cacheFillGroup.Do(req.Code, func() (any, error) {
+		// 再查询一次 Redis，避免其他请求已经缓存
+		key := consts.RedisLinkCodeKey + req.Code
+		cacheVal, err := s.rdb.Get(c, key).Result()
+		if err != nil && !errors.Is(err, redis.Nil) {
+			slog.Warn("failed to get original URL from Redis",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+		}
+		cacheMiss := err != nil
+
+		// 把 cacheVal unmarshal 成 LinkCache
+		if !cacheMiss {
+			var data dtov1.LinkCache
+			if err := json.Unmarshal([]byte(cacheVal), &data); err != nil {
+				slog.Warn("failed to unmarshal cache in cacheFillGroup",
+					slog.String("code", req.Code),
+					slog.String("error", err.Error()))
+			} else {
+				if !s.validateLinkCache(&data) {
+					return nil, consts.ErrInvalidLink
+				}
+				return &data, nil
+			}
+		}
+
+		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
+		if err != nil {
+			// 若为空链接
+			if errors.Is(err, pgx.ErrNoRows) {
+				nullLink := &dtov1.LinkCache{
+					OriginalURL: consts.NullLink,
+					Status:      "",
+					ExpiresAt:   nil,
+				}
+				// 尝试将此空链接缓存入 Redis 中
+				linkCache, err := json.Marshal(nullLink)
+				if err != nil {
+					slog.Warn("failed to marshal null cache in cacheFillGroup",
+						slog.String("code", req.Code),
+						slog.String("error", err.Error()))
+				} else {
+					if err := s.rdb.Set(c, key, linkCache, s.cfg.NullExpires).Err(); err != nil {
+						slog.Warn("failed to cache null link in Redis in cacheFillGroup",
+							slog.String("code", req.Code),
+							slog.String("error", err.Error()))
+					}
+				}
+				return nil, consts.ErrInvalidLink
+			}
+			return nil, err
+		}
+
+		// 若没有报错 无论如何先写入当前快照到 Redis 中 避免缓存穿透
+		linkCache, err := json.Marshal(data)
+		if err != nil {
+			slog.Warn("failed to marshal cache in cacheFillGroup",
+				slog.String("code", req.Code),
+				slog.String("error", err.Error()))
+		} else {
+			if err := s.rdb.Set(c, key, linkCache, s.cfg.Expires).Err(); err != nil {
+				slog.Warn("failed to cache original URL in Redis in cacheFillGroup",
+					slog.String("code", req.Code),
+					slog.String("error", err.Error()))
+			}
+		}
+
+		// 随后判断其合法性，若不合法则不放行
+		if !s.validateLinkCache(data) {
+			return nil, consts.ErrInvalidLink
+		}
+
+		// 若合法则返回 pg 回源链接
+		return data, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	data, ok := value.(*dtov1.LinkCache)
+	if !ok {
+		return nil, consts.ErrInvalidLink
+	}
+
+	return data, nil
 }
 
 func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) error {
@@ -144,7 +247,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 	// 如果 code 可能存在 则继续往下走
 	// 判断对应 code 是否在 redis 中已经缓存
 	key := consts.RedisLinkCodeKey + req.Code
-	cache, err := s.rdb.Get(c, key).Result()
+	cacheVal, err := s.rdb.Get(c, key).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		slog.Warn("failed to get original URL from Redis",
 			slog.String("code", req.Code),
@@ -156,7 +259,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 	var originalURL string
 	if !cacheMiss {
 		var data dtov1.LinkCache
-		if err := json.Unmarshal([]byte(cache), &data); err != nil {
+		if err := json.Unmarshal([]byte(cacheVal), &data); err != nil {
 			// 尝试解析 若解析失败则判断为缓存失效
 			slog.Warn("failed to unmarshal cache",
 				slog.String("code", req.Code),
@@ -164,9 +267,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 			cacheMiss = true
 		} else {
 			// 若解析成功，则判断快照是否合法，若合法则继续，不合法则直接返回 ErrInvalidLink
-			if data.OriginalURL == consts.NullLink ||
-				data.Status == "inactive" ||
-				(data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
+			if !s.validateLinkCache(&data) {
 				return "", consts.ErrInvalidLink
 			}
 			originalURL = data.OriginalURL
@@ -175,51 +276,12 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 
 	// 如果缓存没有命中
 	if cacheMiss {
-		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
+		data, err := s.cacheLink(c, req)
 		if err != nil {
-			// 若为空链接
-			if errors.Is(err, pgx.ErrNoRows) {
-				nullLink := &dtov1.LinkCache{
-					OriginalURL: consts.NullLink,
-					Status:      "",
-					ExpiresAt:   nil,
-				}
-				// 尝试将此空链接缓存入 Redis 中
-				linkCache, err := json.Marshal(nullLink)
-				if err != nil {
-					slog.Warn("failed to marshal null cache",
-						slog.String("code", req.Code),
-						slog.String("error", err.Error()))
-				} else {
-					if err := s.rdb.Set(c, key, linkCache, s.cfg.NullExpires).Err(); err != nil {
-						slog.Warn("failed to cache null link in Redis",
-							slog.String("code", req.Code),
-							slog.String("error", err.Error()))
-					}
-				}
-				return "", consts.ErrInvalidLink
-			}
 			return "", err
 		}
 
-		// 若没有报错 无论如何先写入当前快照到 Redis 中 避免缓存穿透
 		originalURL = data.OriginalURL
-		linkCache, err := json.Marshal(data)
-		if err != nil {
-			slog.Warn("failed to marshal cache",
-				slog.String("code", req.Code),
-				slog.String("error", err.Error()))
-		} else {
-			if err := s.rdb.Set(c, key, linkCache, s.cfg.Expires).Err(); err != nil {
-				slog.Warn("failed to cache original URL in Redis",
-					slog.String("code", req.Code),
-					slog.String("error", err.Error()))
-			}
-		}
-		// 随后判断其合法性，若不合法则不放行
-		if data.Status == "inactive" || (data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
-			return "", consts.ErrInvalidLink
-		}
 	}
 
 	// 避免为浏览器 prefetch/prerender 写入浏览记录
