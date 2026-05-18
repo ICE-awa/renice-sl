@@ -79,9 +79,11 @@ func main() {
 
 	authRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
+	statRepo := repository.NewStatRepository(db)
 
 	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
 	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link, bloom)
+	statSvc := service.NewStatService(statRepo)
 
 	// 布隆过滤器初始化
 	err = linkSvc.InitBloomFilter()
@@ -95,6 +97,7 @@ func main() {
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
 		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
 		LinkHV1: handlerv1.NewLinkHandler(linkSvc),
+		StatHV1: handlerv1.NewStatHandler(statSvc),
 	}
 
 	r := router.Setup(h, &cfg.Jwt, rdb)

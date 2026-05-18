@@ -3,12 +3,18 @@ package router
 import (
 	"github.com/ICE-awa/renice-sl/internal/handler"
 	"github.com/ICE-awa/renice-sl/internal/middleware"
+	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )
 
-func Setup(h *handler.Handlers, cfg *config.JwtConfig, rdb *redis.Client) *gin.Engine {
+func Setup(
+	h *handler.Handlers,
+	cfg *config.JwtConfig,
+	rdb *redis.Client,
+	userRepo repository.UserRepository,
+) *gin.Engine {
 	r := gin.New()
 
 	public := r.Group("/api")
@@ -43,6 +49,15 @@ func Setup(h *handler.Handlers, cfg *config.JwtConfig, rdb *redis.Client) *gin.E
 
 			// stats
 			v1.GET("/stats", h.LinkHV1.GetStats)
+
+			// admin
+			admin := v1.Group("admin")
+			admin.Use(middleware.AdminRequired(userRepo))
+			{
+				admin.GET("/stats/link", h.StatHV1.GetLinkStats)
+				admin.GET("/stats/user", h.StatHV1.GetUserStats)
+				admin.GET("/stats/click", h.StatHV1.GetClickStats)
+			}
 		}
 	}
 

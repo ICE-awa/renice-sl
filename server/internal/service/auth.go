@@ -64,9 +64,22 @@ func (s *authService) Register(c context.Context, req *dtov1.UserRegisterReq) (*
 		Email:    req.Email,
 		Role:     consts.RoleUser,
 	}
-	_, err = s.repo.CreateUser(c, user)
+	id, err := s.repo.CreateUser(c, user)
 	if err != nil {
 		return nil, err
+	}
+
+	// 如果为第一个注册的用户，自动赋予管理员权限
+	if id == 1 {
+		role := consts.RoleAdmin
+		updateReq := &dtov1.UserUpdateReq{
+			ID:   id,
+			Role: &role,
+		}
+		err := s.repo.UpdateUser(c, updateReq)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil

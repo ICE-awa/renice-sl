@@ -365,6 +365,7 @@ SELECT code FROM links WHERE deleted_at IS NULL
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	codes, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
 		var code string
