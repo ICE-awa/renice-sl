@@ -34,6 +34,13 @@ type LinkItem struct {
 	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
+type GetLinksResp struct {
+	Total    int64       `json:"total"`
+	PageNum  int64       `json:"page_num"`
+	PageSize int64       `json:"page_size"`
+	Links    []*LinkItem `json:"links"`
+}
+
 type UpdateLinkReq struct {
 	ID          int64      `json:"id"`
 	UserID      int64      `json:"user_id"`

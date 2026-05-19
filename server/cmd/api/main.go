@@ -77,11 +77,11 @@ func main() {
 
 	linkPublisher := event.NewLinkPublisher(natsClient)
 
-	authRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
 	statRepo := repository.NewStatRepository(db)
 
-	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
+	authSvc := service.NewAuthService(userRepo, rdb, &cfg.Jwt)
 	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link, bloom)
 	statSvc := service.NewStatService(statRepo)
 
@@ -100,7 +100,7 @@ func main() {
 		StatHV1: handlerv1.NewStatHandler(statSvc),
 	}
 
-	r := router.Setup(h, &cfg.Jwt, rdb)
+	r := router.Setup(h, &cfg.Jwt, rdb, userRepo)
 
 	err = r.SetTrustedProxies([]string{
 		"10.0.0.0/8",

@@ -56,13 +56,13 @@ func (h *LinkHandler) GetLinks(c *gin.Context) {
 
 	req.UserID = c.GetInt64("user_id")
 
-	links, err := h.svc.GetLinks(c.Request.Context(), &req)
+	data, err := h.svc.GetLinks(c.Request.Context(), &req)
 	if err != nil {
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
 
-	httputil.OK(c, links)
+	httputil.OK(c, data)
 }
 
 func (h *LinkHandler) UpdateLink(c *gin.Context) {

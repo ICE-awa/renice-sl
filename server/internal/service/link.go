@@ -22,7 +22,7 @@ import (
 
 type LinkService interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) error
-	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
+	GetLinks(context.Context, *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
 	GetLinkByID(context.Context, int64, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
@@ -193,7 +193,7 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 	return nil
 }
 
-func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error) {
+func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error) {
 	return s.repo.GetLinks(c, req)
 }
 

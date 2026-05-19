@@ -15,7 +15,7 @@ import (
 
 type LinkRepository interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) (int64, error)
-	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
+	GetLinks(context.Context, *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) (string, error)
 	GetLinkByID(context.Context, int64, int64) (*model.Link, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) (string, error)
@@ -53,7 +53,7 @@ func (r *linkRepository) CreateLink(c context.Context, req *dtov1.CreateLinkReq)
 	return id, nil
 }
 
-func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error) {
+func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
@@ -103,7 +103,13 @@ LIMIT $%d OFFSET $%d
 
 	args = append(args, req.PageSize, (req.PageNum-1)*req.PageSize)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +163,28 @@ LIMIT $%d OFFSET $%d
 		return nil, err
 	}
 
-	return links, nil
+	queryTotal := `
+SELECT count(*) FROM links WHERE user_id = $1 AND deleted_at IS NULL
+`
+	var total int64
+	err = tx.QueryRow(ctx, queryTotal, req.UserID).Scan(&total)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &dtov1.GetLinksResp{
+		Total:    total,
+		PageNum:  req.PageNum,
+		PageSize: req.PageSize,
+		Links:    links,
+	}
+
+	return data, nil
 }
 
 func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) (string, error) {
