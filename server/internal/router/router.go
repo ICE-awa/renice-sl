@@ -49,15 +49,9 @@ func Setup(
 
 			// stats
 			v1.GET("/stats", h.LinkHV1.GetStats)
-
-			// admin
-			admin := v1.Group("admin")
-			admin.Use(middleware.AdminRequired(userRepo))
-			{
-				admin.GET("/stats/link", h.StatHV1.GetLinkStats)
-				admin.GET("/stats/user", h.StatHV1.GetUserStats)
-				admin.GET("/stats/click", h.StatHV1.GetClickStats)
-			}
+			v1.GET("/stats/link", h.StatHV1.GetLinkStats)
+			v1.GET("/stats/user", h.StatHV1.GetUserStats)
+			v1.GET("/stats/click", h.StatHV1.GetClickStats)
 		}
 	}
 
