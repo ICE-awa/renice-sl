@@ -39,11 +39,11 @@ WITH days AS (
 )
 SELECT
     days.day,
-    count(*)
+    count(click_log.id)
 FROM days
 LEFT JOIN click_log
-    ON click_log.created_at >= days.day
-	AND click_log.created_at < days.day + interval '1 day'
+    ON click_log.clicked_at >= days.day
+	AND click_log.clicked_at < days.day + interval '1 day'
 GROUP BY days.day
 ORDER BY days.day
 `
@@ -57,7 +57,7 @@ ORDER BY days.day
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.ClickStatItem, error) {
 		var item dtov1.ClickStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +85,7 @@ WITH days AS (
 )
 SELECT
     days.day,
-    count(*)
+    count(links.id)
 FROM days
 LEFT JOIN links
     ON links.created_at >= days.day
@@ -103,7 +103,7 @@ ORDER BY days.day
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.LinkStatItem, error) {
 		var item dtov1.LinkStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ WITH days AS (
 )
 SELECT
 	days.day,
-	count(*)
+	count(users.id)
 FROM days
 LEFT JOIN users
     ON users.created_at >= days.day
@@ -149,7 +149,7 @@ ORDER BY days.day
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.UserStatItem, error) {
 		var item dtov1.UserStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}
@@ -177,11 +177,11 @@ WITH hours AS (
 )
 SELECT
 	hours.hour,
-	count(*)
+	count(click_log.id)
 FROM hours
 LEFT JOIN click_log
-WHERE click.log.created_at >= hours.hour
-AND click_log.created_at < hours.hour + interval '1 hour'
+ON click_log.clicked_at >= hours.hour
+AND click_log.clicked_at < hours.hour + interval '1 hour'
 GROUP BY hours.hour
 ORDER BY hours.hour
 `
@@ -194,7 +194,7 @@ ORDER BY hours.hour
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.ClickStatItem, error) {
 		var item dtov1.ClickStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}
@@ -222,10 +222,10 @@ WITH hours AS (
 )
 SELECT
 	hours.hour,
-	SELECT(*)
+	count(links.id)
 FROM hours
 LEFT JOIN links
-WHERE links.created_at >= hours.hour
+ON links.created_at >= hours.hour
 AND links.created_at < hours.hour + interval '1 hour'
 GROUP BY hours.hour
 ORDER BY hours.hour
@@ -239,7 +239,7 @@ ORDER BY hours.hour
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.LinkStatItem, error) {
 		var item dtov1.LinkStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}
@@ -267,10 +267,10 @@ WITH hours AS (
 )
 SELECT
 	hours.hour,
-	count(*)
+	count(users.id)
 FROM hours
 LEFT JOIN users
-WHERE users.created_at >= hours.hour
+ON users.created_at >= hours.hour
 AND users.created_at < hours.hour + interval '1 hour'
 GROUP BY hours.hour
 ORDER BY hours.hour
@@ -284,7 +284,7 @@ ORDER BY hours.hour
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.UserStatItem, error) {
 		var item dtov1.UserStatItem
 
-		err := row.Scan(&item)
+		err := row.Scan(&item.Time, &item.Count)
 		if err != nil {
 			return nil, err
 		}

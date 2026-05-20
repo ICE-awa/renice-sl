@@ -5,6 +5,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/shared/httputil"
 	"github.com/gin-gonic/gin"
+	"log/slog"
 )
 
 type StatHandler struct {
@@ -24,6 +25,8 @@ func (h *StatHandler) GetLinkStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetLinkStats(c.Request.Context(), req)
 	if err != nil {
+		slog.Warn("failed to get link stats",
+			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -40,6 +43,8 @@ func (h *StatHandler) GetClickStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetClickStats(c.Request.Context(), req)
 	if err != nil {
+		slog.Warn("failed to get click stats",
+			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -56,6 +61,8 @@ func (h *StatHandler) GetUserStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetUserStats(c.Request.Context(), req)
 	if err != nil {
+		slog.Warn("failed to get user stats",
+			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
