@@ -101,6 +101,7 @@ LIMIT $%d OFFSET $%d
 		argIndex,
 		argIndex+1)
 
+	totalArgs := args
 	args = append(args, req.PageSize, (req.PageNum-1)*req.PageSize)
 
 	tx, err := r.db.Begin(ctx)
@@ -163,11 +164,15 @@ LIMIT $%d OFFSET $%d
 		return nil, err
 	}
 
-	queryTotal := `
-SELECT count(*) FROM links WHERE user_id = $1 AND deleted_at IS NULL
-`
+	queryTotal := fmt.Sprintf(`
+SELECT count(*) 
+FROM links 
+WHERE %s
+AND deleted_at IS NULL
+`,
+		strings.Join(whereClauses, " AND "))
 	var total int64
-	err = tx.QueryRow(ctx, queryTotal, req.UserID).Scan(&total)
+	err = tx.QueryRow(ctx, queryTotal, totalArgs...).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
