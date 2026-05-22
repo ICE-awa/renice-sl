@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api";
 import {
   CreateLinkInput,
   GetLinksInput,
+  GetLinksResponse,
   GetStatsResponse,
   LinkItem,
   UpdateLinkInput,
@@ -16,9 +17,12 @@ export function getLinks(params: GetLinksInput) {
     }
   });
 
-  return apiFetch<LinkItem[]>(`/api/v1/links?${searchParams.toString()}`, {
-    method: "GET",
-  });
+  return apiFetch<GetLinksResponse>(
+    `/api/v1/links?${searchParams.toString()}`,
+    {
+      method: "GET",
+    },
+  );
 }
 
 export function getLinkByID(id: number) {

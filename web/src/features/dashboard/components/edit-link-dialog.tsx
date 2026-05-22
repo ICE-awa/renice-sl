@@ -6,10 +6,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LinkItem, UpdateLinkFormValues, UpdateLinkInput } from "../types";
+import { LinkItem, UpdateLinkFormValues } from "../types";
 import { Controller, useForm } from "react-hook-form";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { updateLinkSchema } from "../schemas";
+import { updateLinkSchema, UpdateLinkInput } from "../schemas";
 import {
   Field,
   FieldError,
@@ -42,7 +42,7 @@ export default function EditLinkDialog({
   onSubmit,
   item,
 }: EditLinkDialogProps) {
-  const form = useForm<UpdateLinkFormValues>({
+  const form = useForm<UpdateLinkInput>({
     resolver: standardSchemaResolver(updateLinkSchema),
     defaultValues: {
       original_url: "",
@@ -52,7 +52,7 @@ export default function EditLinkDialog({
     },
   });
 
-  async function handleSubmit(data: UpdateLinkFormValues) {
+  async function handleSubmit(data: UpdateLinkInput) {
     if (item === null) {
       return;
     }

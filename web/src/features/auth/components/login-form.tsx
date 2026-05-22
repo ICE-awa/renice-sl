@@ -14,11 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { toast } from "sonner";
-import { login } from "../api";
+import { login, refresh } from "../api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { scheduleRefresh } from "../../protected/components/session";
 import { ApiError } from "@/lib/api";
+import { useEffect } from "react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -43,7 +44,20 @@ export function LoginForm() {
       toast.error(message);
     }
   }
-  // TODO 如果登录过了，则直接跳转到 dashboard
+  useEffect(() => {
+    let alive = true;
+
+    refresh()
+      .then(() => {
+        if (!alive) return;
+        router.replace("/dashboard");
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   return (
     <Card className="w-full max-w-sm">
