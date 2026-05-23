@@ -9,4 +9,5 @@ var (
 	ErrFailedToGenerateCode  = errors.New("failed to generate code")
 	ErrNoRowsAffected        = errors.New("no rows affected")
 	ErrInvalidLink           = errors.New("invalid link")
+	ErrInvalidBucket         = errors.New("invalid bucket")
 )

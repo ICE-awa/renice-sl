@@ -56,6 +56,7 @@ export function RegisterForm() {
           return;
         }
       }
+      toast.error("请检查表单项是否正确填写");
     }
   }
 

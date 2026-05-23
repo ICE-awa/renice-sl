@@ -7,12 +7,16 @@ import { getClickStat, getLinkStat, getUserStat } from "../api";
 import { StatResponse } from "../type";
 import { ApiError } from "@/lib/api";
 import { toast } from "sonner";
+import { useSession } from "@/features/protected/components/session-provider";
+import { useRouter } from "next/navigation";
 
 export function ChartsClient() {
   const [granularity, setGranularity] = useState<"day" | "hour">("day");
   const [clickData, setClickData] = useState([] as StatResponse[]);
   const [userData, setUserData] = useState([] as StatResponse[]);
   const [linkData, setLinkData] = useState([] as StatResponse[]);
+  const { user } = useSession();
+  const router = useRouter();
 
   function handleGranularityChange(value: "hour" | "day") {
     setGranularity(value);
@@ -20,6 +24,11 @@ export function ChartsClient() {
 
   useEffect(() => {
     let ignore = false;
+
+    if (user.role !== "admin") {
+      router.replace("/dashboard");
+      return;
+    }
 
     async function initialChartData() {
       if (ignore) return;
@@ -50,7 +59,7 @@ export function ChartsClient() {
     return () => {
       ignore = true;
     };
-  }, [granularity]);
+  }, [granularity, router, user.role]);
 
   return (
     <div className="flex flex-1 flex-col min-h-0 gap-4">

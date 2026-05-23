@@ -7,6 +7,7 @@ const (
 	CodeInvalidEmailCode     = 400002
 	CodeInvalidIdentifier    = 400003
 	CodeInvalidPassword      = 400004
+	CodeInvalidBucket        = 400005
 	CodeUnauthorized         = 401000
 	CodeInvalidRefreshToken  = 401001
 	CodeForbidden            = 403000

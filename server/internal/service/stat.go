@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 )
@@ -23,23 +24,29 @@ func NewStatService(repo repository.StatRepository) StatService {
 func (s *statService) GetLinkStats(c context.Context, req *dtov1.GetLinkStatReq) ([]*dtov1.LinkStatItem, error) {
 	if req.Bucket == "day" {
 		return s.repo.GetLinkDayStat(c, req.Range)
-	} else {
+	} else if req.Bucket == "hour" {
 		return s.repo.GetLinkHourStat(c, req.Range)
+	} else {
+		return nil, consts.ErrInvalidBucket
 	}
 }
 
 func (s *statService) GetClickStats(c context.Context, req *dtov1.GetClickStatReq) ([]*dtov1.ClickStatItem, error) {
 	if req.Bucket == "day" {
 		return s.repo.GetClickDayStat(c, req.Range)
-	} else {
+	} else if req.Bucket == "hour" {
 		return s.repo.GetClickHourStat(c, req.Range)
+	} else {
+		return nil, consts.ErrInvalidBucket
 	}
 }
 
 func (s *statService) GetUserStats(c context.Context, req *dtov1.GetUserStatReq) ([]*dtov1.UserStatItem, error) {
 	if req.Bucket == "day" {
 		return s.repo.GetUserDayStat(c, req.Range)
-	} else {
+	} else if req.Bucket == "hour" {
 		return s.repo.GetUserHourStat(c, req.Range)
+	} else {
+		return nil, consts.ErrInvalidBucket
 	}
 }

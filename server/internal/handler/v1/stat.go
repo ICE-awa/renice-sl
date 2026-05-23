@@ -1,11 +1,14 @@
 package v1
 
 import (
+	"errors"
+	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/shared/httputil"
 	"github.com/gin-gonic/gin"
 	"log/slog"
+	"net/http"
 )
 
 type StatHandler struct {
@@ -25,6 +28,10 @@ func (h *StatHandler) GetLinkStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetLinkStats(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, consts.ErrInvalidBucket) {
+			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
+			return
+		}
 		slog.Warn("failed to get link stats",
 			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
@@ -43,6 +50,10 @@ func (h *StatHandler) GetClickStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetClickStats(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, consts.ErrInvalidBucket) {
+			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
+			return
+		}
 		slog.Warn("failed to get click stats",
 			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
@@ -61,6 +72,10 @@ func (h *StatHandler) GetUserStats(c *gin.Context) {
 
 	stats, err := h.statSvc.GetUserStats(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, consts.ErrInvalidBucket) {
+			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
+			return
+		}
 		slog.Warn("failed to get user stats",
 			slog.String("error", err.Error()))
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
