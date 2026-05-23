@@ -1,5 +1,7 @@
 [toc]
 
+## 接口压测统计
+
 ### 场景：没有 redis/mq，点击短链接时同步写入日志时
 
 ```
@@ -570,4 +572,372 @@ INFO stats
 keyspace_hits:1801113
 keyspace_misses:6333
 ```
+
+
+
+## PG EXPLAIN ANYLYZE
+
+### click_log: clicked_at 统计
+
+> 以 90 天 200w 条大表，查 7 天以内的数据
+>
+> 优化前全表扫描且 Execution Time: 1841.568 ms，被 Materialize 后消费了 7*200w=1400w 次，且 Rows Removed by Join Filter 1380w，且出现 temp read/write，说明存在大量无效比较和临时磁盘 IO。
+>
+> 第一次优化后出现 Bitmap Heap Scan/Bitmap Index Scan，Execution Time 优化至 342.305ms，但仍然 loop 了 7 次，且还需要回表读取 heap page 来 count
+>
+> 第二次优化后，从按日期桶重复执行的 Nested Loop Left Join 变为了先聚合再补齐日期的 Hash Left Join；且 Bitmap Heap Scan 的 loops 从 7 变为 1，Heap Blocks 从约 8.8w 降到约 1.8w ，Execution Time 优化至 约 136.010ms
+
+```postgresql
+BEGIN;
+
+INSERT INTO click_log (event_id, code, ip, user_agent, referer, clicked_at)
+SELECT
+  g,
+  'code_' || (g % 1000),
+  '127.0.0.1'::inet,
+  'bench',
+  '',
+  now() - (random() * interval '90 days')
+FROM generate_series(1, 2000000) AS g;
+
+ANALYZE click_log;
+
+EXPLAIN (ANALYZE, BUFFERS)
+WITH days AS (
+	SELECT generate_series(
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (6 * interval '1 day'),
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
+		interval '1 day'
+	) AS day
+)
+SELECT
+    days.day,
+    count(click_log.id)
+FROM days
+LEFT JOIN click_log
+    ON click_log.clicked_at >= days.day
+	AND click_log.clicked_at < days.day + interval '1 day'
+GROUP BY days.day
+ORDER BY days.day;
+
+ROLLBACK;
+```
+
+**使用索引前：**
+
+![](./images/click_1.png)
+
+**使用索引后：**
+
+![](./images/click_2.png)
+
+**先筛选出七天的数据然后再统计：**
+
+```postgresql
+WITH bounds AS (
+	SELECT date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+    	generate_series(
+        	today - 6 * interval '1 day',
+            today,
+            interval '1 day'
+        ) AS day
+    FROM bounds
+),
+agg AS (
+	SELECT
+    	date_trunc('day', clicked_at AT TIME ZONE 'Asia/Shanghai') AS day,
+    	count(*) AS count
+    FROM click_log
+    CROSS JOIN bounds
+    WHERE
+    	clicked_at >= (today - 6 * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND clicked_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
+)
+SELECT
+	days.day,
+	COALESCE(agg.count, 0) AS count
+FROM days
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
+```
+
+![](./images/click_3.png)
+
+
+
+### links: created_at 统计
+
+> 以 90 天 10000 个用户，200w 短链接，并查 7 天的情况
+>
+> 优化前全表扫描且 Execution Time: 1841.568 ms，被 Materialize 后消费了 7*200w=1400w 次，且 Rows Removed by Join Filter 1380w，且出现 temp read/write，说明存在大量无效比较和临时磁盘 IO。
+>
+> 第一季优化后出现 Bitmap Heap Scan/Bitmap Index Scan，Execution Time 优化至 575.875ms
+>
+> 第二次优化后，从按日期桶重复执行的 Nested Loop Left Join 变为了先聚合再补齐日期的 Hash Left Join；且 Bitmap Heap Scan 的 loops 从 7 变为 1，Heap Blocks 从约 10.9w 降到约 3.2w ，Execution Time 优化至约 179.436ms
+
+```postgresql
+BEGIN;
+
+INSERT INTO users (
+  username,
+  email,
+  password,
+  role,
+  created_at,
+  updated_at,
+  deleted_at
+)
+SELECT
+  'bench_user_' || g AS username,
+  'bench_user_' || g || '@example.com' AS email,
+  '$2a$10$bench_hash_placeholder' AS password,
+  CASE
+    WHEN random() < 0.02 THEN 'admin'
+    ELSE 'user'
+  END AS role,
+  created_at,
+  created_at + (random() * interval '7 days') AS updated_at,
+  CASE
+    WHEN random() < 0.02 THEN created_at + (random() * interval '30 days')
+    ELSE NULL
+  END AS deleted_at
+FROM (
+  SELECT
+    g,
+    now() - (random() * interval '90 days') AS created_at
+  FROM generate_series(1, 10000) AS g
+) AS s
+ON CONFLICT (username) DO NOTHING;
+
+ANALYZE users;
+
+INSERT INTO links (
+  user_id,
+  code,
+  original_url,
+  view_count,
+  status,
+  expires_at,
+  created_at,
+  updated_at,
+  deleted_at
+)
+SELECT
+  u.id AS user_id,
+  'b' || lpad(g::text, 9, '0') AS code,
+  'https://example.com/page/' || g AS original_url,
+  floor(random() * 10000)::bigint AS view_count,
+  CASE
+    WHEN random() < 0.85 THEN 'active'
+    ELSE 'inactive'
+  END AS status,
+  CASE
+    WHEN random() < 0.75 THEN NULL
+    ELSE s.created_at + ((random() * 120)::int * interval '1 day')
+  END AS expires_at,
+  s.created_at,
+  s.created_at + (random() * interval '14 days') AS updated_at,
+  CASE
+    WHEN random() < 0.03 THEN s.created_at + (random() * interval '30 days')
+    ELSE NULL
+  END AS deleted_at
+FROM (
+  SELECT
+    g,
+    now() - (random() * interval '90 days') AS created_at,
+    1 + floor(random() * 10000)::bigint AS random_user_id
+  FROM generate_series(1, 2000000) AS g
+) AS s
+JOIN users u
+  ON u.username = 'bench_user_' || s.random_user_id
+ON CONFLICT (code) DO NOTHING;
+
+ANALYZE links;
+
+EXPLAIN (ANALYZE, BUFFERS)
+WITH days AS (
+	SELECT generate_series(
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (6 * interval '1 day'),
+        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
+		interval '1 day'
+	) AS day
+)
+SELECT
+    days.day,
+    count(links.id)
+FROM days
+LEFT JOIN links
+    ON links.created_at >= days.day
+    AND links.created_at < days.day + interval '1 day'
+GROUP BY days.day
+ORDER BY days.day;
+
+ROLLBACK;
+```
+
+**使用索引前：**
+
+![](./images/link_1.png)
+
+**使用索引后：**
+
+![](./images/link_2.png)
+
+**先筛选出七天的数据然后再统计：**
+
+```postgresql
+WITH bounds AS (
+	SELECT
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+		generate_series(
+			today - 6 * interval '1 day',
+			today,
+			interval '1 day'
+		) AS day
+	FROM bounds
+),
+agg AS (
+	SELECT
+		date_trunc('day', created_at AT TIME ZONE 'Asia/Shanghai') AS day,
+		count(*) AS count
+	FROM links
+	CROSS JOIN bounds
+	WHERE
+		created_at >= (today - 6 * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
+)
+SELECT
+	days.day,
+	COALESCE(agg.count, 0) AS count
+FROM days
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
+```
+
+![](./images/link_3.png)
+
+
+
+### users: created_at 统计
+
+> 以 90 天 200w 用户的情况
+>
+> 优化前全表扫描且 Execution Time: 1841.568 ms，被 Materialize 后消费了 7*200w=1400w 次，且 Rows Removed by Join Filter 1380w，且出现 temp read/write，说明存在大量无效比较和临时磁盘 IO。
+>
+> 第一次优化后出现 Bitmap Heap Scan/Bitmap Index Scan，Execution Time 优化至 614.797ms
+>
+> 第二次优化后，从按日期桶重复执行的 Nested Loop Left Join 变为了先聚合再补齐日期的 Hash Left Join；且 Bitmap Heap Scan 的 loops 从 7 变为 1，Heap Blocks 从约 11.1w 降到约 3.4w ，Execution Time 优化至约 194.447ms
+
+```postgresql
+BEGIN;
+
+INSERT INTO users (
+  username,
+  email,
+  password,
+  role,
+  created_at,
+  updated_at,
+  deleted_at
+)
+SELECT
+  'bench_user_' || g AS username,
+  'bench_user_' || g || '@example.com' AS email,
+  '$2a$10$bench_hash_placeholder' AS password,
+  CASE
+    WHEN random() < 0.02 THEN 'admin'
+    ELSE 'user'
+  END AS role,
+  created_at,
+  created_at + (random() * interval '7 days') AS updated_at,
+  CASE
+    WHEN random() < 0.02 THEN created_at + (random() * interval '30 days')
+    ELSE NULL
+  END AS deleted_at
+FROM (
+  SELECT
+    g,
+    now() - (random() * interval '90 days') AS created_at
+  FROM generate_series(1, 2000000) AS g
+) AS s
+ON CONFLICT (username) DO NOTHING;
+
+ANALYZE users;
+
+EXPLAIN (ANALYZE, BUFFERS)
+WITH days AS (
+    SELECT generate_series(
+        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (6 * interval '1 day'),
+        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
+        interval '1 day'
+    ) AS day
+)
+SELECT
+	days.day,
+	count(users.id)
+FROM days
+LEFT JOIN users
+    ON users.created_at >= days.day
+    AND users.created_at < days.day + interval '1 day'
+GROUP BY days.day
+ORDER BY days.day;
+
+ROLLBACK;
+```
+
+**使用索引前：**
+
+![](./images/user_1.png)
+
+**使用索引后：**
+
+![](./images/user_2.png)
+
+**先筛选出七天的数据然后再统计：**
+
+```postgresql
+WITH bounds AS (
+	SELECT
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+		generate_series(
+			today - 6 * interval '1 day',
+			today,
+            interval '1 day'
+		) AS day
+    FROM bounds
+),
+agg AS (
+    SELECT
+    	date_trunc('day', created_at AT TIME ZONE 'Asia/Shanghai') AS day,
+    	count(*) AS count
+    FROM users
+    CROSS JOIN bounds
+    WHERE
+    	created_at >= (today - 6 * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
+)
+SELECT
+	days.day,
+	COALESCE(agg.count, 0) AS count
+FROM days
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
+```
+
+
 

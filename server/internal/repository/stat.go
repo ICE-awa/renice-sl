@@ -30,22 +30,36 @@ func (r *statRepository) GetClickDayStat(c context.Context, day int) ([]*dtov1.C
 	defer cancel()
 
 	query := `
-WITH days AS (
-	SELECT generate_series(
-		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 day'),
-		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
-		interval '1 day'
-	) AS day
+WITH bounds AS (
+	SELECT date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+    	generate_series(
+        	today - ($1::int - 1) * interval '1 day',
+            today,
+            interval '1 day'
+        ) AS day
+    FROM bounds
+),
+agg AS (
+	SELECT
+    	date_trunc('day', clicked_at AT TIME ZONE 'Asia/Shanghai') AS day,
+    	count(*) AS count
+    FROM click_log
+    CROSS JOIN bounds
+    WHERE
+    	clicked_at >= (today - ($1::int - 1) * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND clicked_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
-    days.day,
-    count(click_log.id)
+	days.day,
+	COALESCE(agg.count, 0) AS count
 FROM days
-LEFT JOIN click_log
-    ON click_log.clicked_at >= days.day
-	AND click_log.clicked_at < days.day + interval '1 day'
-GROUP BY days.day
-ORDER BY days.day
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
 `
 
 	rows, err := r.db.Query(ctx, query, day)
@@ -76,22 +90,37 @@ func (r *statRepository) GetLinkDayStat(c context.Context, day int) ([]*dtov1.Li
 	defer cancel()
 
 	query := `
-WITH days AS (
-	SELECT generate_series(
-		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 day'),
-        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
-		interval '1 day'
-	) AS day
+WITH bounds AS (
+	SELECT
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+		generate_series(
+			today - ($1::int - 1) * interval '1 day',
+			today,
+			interval '1 day'
+		) AS day
+	FROM bounds
+),
+agg AS (
+	SELECT
+		date_trunc('day', created_at AT TIME ZONE 'Asia/Shanghai') AS day,
+		count(*) AS count
+	FROM links
+	CROSS JOIN bounds
+	WHERE
+		created_at >= (today - ($1::int - 1) * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
-    days.day,
-    count(links.id)
+	days.day,
+	COALESCE(agg.count, 0) AS count
 FROM days
-LEFT JOIN links
-    ON links.created_at >= days.day
-    AND links.created_at < days.day + interval '1 day'
-GROUP BY days.day
-ORDER BY days.day
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
 `
 
 	rows, err := r.db.Query(ctx, query, day)
@@ -122,22 +151,37 @@ func (r *statRepository) GetUserDayStat(c context.Context, day int) ([]*dtov1.Us
 	defer cancel()
 
 	query := `
-WITH days AS (
-    SELECT generate_series(
-        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 day'),
-        date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai'),
-        interval '1 day'
-    ) AS day
+WITH bounds AS (
+	SELECT
+		date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AS today
+),
+days AS (
+	SELECT
+		generate_series(
+			today - ($1::int - 1) * interval '1 day',
+			today,
+            interval '1 day'
+		) AS day
+    FROM bounds
+),
+agg AS (
+    SELECT
+    	date_trunc('day', created_at AT TIME ZONE 'Asia/Shanghai') AS day,
+    	count(*) AS count
+    FROM users
+    CROSS JOIN bounds
+    WHERE
+    	created_at >= (today - ($1::int - 1) * interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (today + interval '1 day') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
 	days.day,
-	count(users.id)
+	COALESCE(agg.count, 0) AS count
 FROM days
-LEFT JOIN users
-    ON users.created_at >= days.day
-    AND users.created_at < days.day + interval '1 day'
-GROUP BY days.day
-ORDER BY days.day
+LEFT JOIN agg
+	ON agg.day = days.day
+ORDER BY days.day;
 `
 
 	rows, err := r.db.Query(ctx, query, day)
@@ -168,22 +212,36 @@ func (r *statRepository) GetClickHourStat(c context.Context, hour int) ([]*dtov1
 	defer cancel()
 
 	query := `
-WITH hours AS (
-	SELECT generate_series(
-		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 hour'),
-        date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai'),
-        interval '1 hour'
-	) AS hour
+WITH bounds AS (
+	SELECT date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') AS currentHour
+),
+hours AS (
+	SELECT
+    	generate_series(
+        	currentHour - ($1::int - 1) * interval '1 hour',
+            currentHour,
+            interval '1 hour'
+        ) AS hour
+    FROM bounds
+),
+agg AS (
+	SELECT
+    	date_trunc('hour', clicked_at AT TIME ZONE 'Asia/Shanghai') AS hour,
+    	count(*) AS count
+    FROM click_log
+    CROSS JOIN bounds
+    WHERE
+    	clicked_at >= (currentHour - ($1::int - 1) * interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    	AND clicked_at < (currentHour + interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
 	hours.hour,
-	count(click_log.id)
+	COALESCE(agg.count, 0) AS count
 FROM hours
-LEFT JOIN click_log
-ON click_log.clicked_at >= hours.hour
-AND click_log.clicked_at < hours.hour + interval '1 hour'
-GROUP BY hours.hour
-ORDER BY hours.hour
+LEFT JOIN agg
+	ON agg.hour = hours.hour
+ORDER BY hours.hour;
 `
 
 	rows, err := r.db.Query(ctx, query, hour)
@@ -213,22 +271,37 @@ func (r *statRepository) GetLinkHourStat(c context.Context, hour int) ([]*dtov1.
 	defer cancel()
 
 	query := `
-WITH hours AS (
-	SELECT generate_series(
-		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 hour'),
-		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai'),
-		interval '1 hour'
-	) AS hour
+WITH bounds AS (
+	SELECT
+		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') AS currentHour
+),
+hours AS (
+	SELECT
+		generate_series(
+			currentHour - ($1::int - 1) * interval '1 hour',
+			currentHour,
+			interval '1 hour'
+		) AS hour
+	FROM bounds
+),
+agg AS (
+	SELECT
+		date_trunc('hour', created_at AT TIME ZONE 'Asia/Shanghai') AS hour,
+		count(*) AS count
+	FROM links
+	CROSS JOIN bounds
+	WHERE
+		created_at >= (currentHour - ($1::int - 1) * interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (currentHour + interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
 	hours.hour,
-	count(links.id)
+	COALESCE(agg.count, 0) AS count
 FROM hours
-LEFT JOIN links
-ON links.created_at >= hours.hour
-AND links.created_at < hours.hour + interval '1 hour'
-GROUP BY hours.hour
-ORDER BY hours.hour
+LEFT JOIN agg
+	ON agg.hour = hours.hour
+ORDER BY hours.hour;
 `
 
 	rows, err := r.db.Query(ctx, query, hour)
@@ -258,22 +331,37 @@ func (r *statRepository) GetUserHourStat(c context.Context, hour int) ([]*dtov1.
 	defer cancel()
 
 	query := `
-WITH hours AS (
-	SELECT generate_series(
-		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') - (($1::int - 1) * interval '1 hour'),
-		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai'),
-		interval '1 hour'
-	) AS hour
+WITH bounds AS (
+	SELECT
+		date_trunc('hour', now() AT TIME ZONE 'Asia/Shanghai') AS currentHour
+),
+hours AS (
+	SELECT
+		generate_series(
+			currentHour - ($1::int - 1) * interval '1 hour',
+			currentHour,
+            interval '1 hour'
+		) AS hour
+    FROM bounds
+),
+agg AS (
+    SELECT
+    	date_trunc('hour', created_at AT TIME ZONE 'Asia/Shanghai') AS hour,
+    	count(*) AS count
+    FROM users
+    CROSS JOIN bounds
+    WHERE
+    	created_at >= (currentHour - ($1::int - 1) * interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    	AND created_at < (currentHour + interval '1 hour') AT TIME ZONE 'Asia/Shanghai'
+    GROUP BY 1
 )
 SELECT
 	hours.hour,
-	count(users.id)
+	COALESCE(agg.count, 0) AS count
 FROM hours
-LEFT JOIN users
-ON users.created_at >= hours.hour
-AND users.created_at < hours.hour + interval '1 hour'
-GROUP BY hours.hour
-ORDER BY hours.hour
+LEFT JOIN agg
+	ON agg.hour = hours.hour
+ORDER BY hours.hour;
 `
 
 	rows, err := r.db.Query(ctx, query, hour)
