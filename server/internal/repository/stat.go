@@ -248,6 +248,7 @@ ORDER BY hours.hour;
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.ClickStatItem, error) {
 		var item dtov1.ClickStatItem
@@ -308,6 +309,7 @@ ORDER BY hours.hour;
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.LinkStatItem, error) {
 		var item dtov1.LinkStatItem
@@ -368,6 +370,7 @@ ORDER BY hours.hour;
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	data, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*dtov1.UserStatItem, error) {
 		var item dtov1.UserStatItem

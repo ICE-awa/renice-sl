@@ -8,6 +8,7 @@ const (
 	CodeInvalidIdentifier    = 400003
 	CodeInvalidPassword      = 400004
 	CodeInvalidBucket        = 400005
+	CodeInvalidRange         = 400006
 	CodeUnauthorized         = 401000
 	CodeInvalidRefreshToken  = 401001
 	CodeForbidden            = 403000
