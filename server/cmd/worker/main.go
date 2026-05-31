@@ -53,13 +53,27 @@ func main() {
 	}
 
 	linkRepo := repository.NewLinkRepository(db)
+	dlqRepo := repository.NewDLQRepository(db)
 
-	linkService := service.NewLinkEventService(linkRepo)
+	linkService := service.NewLinkEventService(linkRepo, dlqRepo)
 
-	linkWorker := worker.NewLinkClickWorker(linkService)
+	linkWorker := worker.NewLinkWorker(linkService, natsClient)
+	dlqWorker := worker.NewDLQWorker(natsClient, dlqRepo)
 
-	if err := linkWorker.StartLinkClickWorker(natsClient); err != nil {
+	if err := linkWorker.StartLinkClickWorker(); err != nil {
 		slog.Error("Error starting worker",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if err := linkWorker.StartLinkCheckWorker(); err != nil {
+		slog.Error("Error starting worker",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if err := dlqWorker.StartDLQWorker(); err != nil {
+		slog.Error("Error starting DLQ worker",
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}

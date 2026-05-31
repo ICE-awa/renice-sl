@@ -50,11 +50,17 @@ func Setup(
 			// stats
 			v1.GET("/stats", h.LinkHV1.GetStats)
 
+			// admin
 			admin := v1.Group("/admin")
 			admin.Use(middleware.AdminRequired(userRepo))
+			// admin stats
 			admin.GET("/stats/link", h.StatHV1.GetLinkStats)
 			admin.GET("/stats/user", h.StatHV1.GetUserStats)
 			admin.GET("/stats/click", h.StatHV1.GetClickStats)
+			// admin dlq
+			admin.GET("/dlq", h.DLQHV1.GetDLQMessages)
+			admin.POST("/dlq/retry/:id", h.DLQHV1.RetryDLQMessage)
+			admin.POST("/dlq/resolve/:id", h.DLQHV1.MarkAsResolved)
 		}
 	}
 

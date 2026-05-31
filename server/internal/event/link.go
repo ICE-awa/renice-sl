@@ -6,7 +6,10 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/mq"
 )
 
-const SubjectLinkClicked = "link.clicked"
+const (
+	SubjectLinkClicked = "link.clicked"
+	SubjectLinkChecked = "link.checked"
+)
 
 type LinkPublisher struct {
 	nats *mq.NatsClient
@@ -24,5 +27,15 @@ func (p *LinkPublisher) PublishLinkClicked(event *dtov1.ClickLinkReq) error {
 	}
 
 	_, err = p.nats.JetStream.Publish(SubjectLinkClicked, data)
+	return err
+}
+
+func (p *LinkPublisher) PublishLinkChecked(event *dtov1.CheckLinkReq) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	
+	_, err = p.nats.JetStream.Publish(SubjectLinkChecked, data)
 	return err
 }

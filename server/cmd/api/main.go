@@ -80,10 +80,12 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
 	statRepo := repository.NewStatRepository(db)
+	dlqRepo := repository.NewDLQRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, rdb, &cfg.Jwt)
 	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link, bloom)
 	statSvc := service.NewStatService(statRepo)
+	dlqSvc := service.NewDLQService(dlqRepo, natsClient)
 
 	// 布隆过滤器初始化
 	err = linkSvc.InitBloomFilter()
@@ -98,6 +100,7 @@ func main() {
 		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
 		LinkHV1: handlerv1.NewLinkHandler(linkSvc),
 		StatHV1: handlerv1.NewStatHandler(statSvc),
+		DLQHV1:  handlerv1.NewDLQHandler(dlqSvc),
 	}
 
 	r := router.Setup(h, &cfg.Jwt, rdb, userRepo)

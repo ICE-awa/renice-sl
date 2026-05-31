@@ -25,6 +25,7 @@ type LinkRepository interface {
 	GetViewCountByUserID(context.Context, int64) (int64, error)
 	GetLinkCountByUserID(context.Context, int64) (int64, error)
 	GetAllLinkCodes(context.Context) ([]string, error)
+	RecordLinkCheck(ctx context.Context, code string, status string) error
 }
 type linkRepository struct {
 	db *pgxpool.Pool
@@ -40,7 +41,7 @@ func (r *linkRepository) CreateLink(c context.Context, req *dtov1.CreateLinkReq)
 
 	query := `
 		INSERT INTO links(user_id, original_url, code, expires_at, created_at, updated_at, view_count, status)
-		VALUES ($1, $2, $3, $4, now(), now(), 0, 'active')
+		VALUES ($1, $2, $3, $4, now(), now(), 0, 'pending')
 		RETURNING id
 	`
 
@@ -414,4 +415,18 @@ SELECT code FROM links WHERE deleted_at IS NULL
 	}
 
 	return codes, nil
+}
+
+func (r *linkRepository) RecordLinkCheck(ctx context.Context, code string, status string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+UPDATE links
+SET status = $1
+WHERE code = $2 AND deleted_at IS NULL
+`
+
+	_, err := r.db.Exec(ctx, query, status, code)
+	return err
 }

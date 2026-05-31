@@ -37,6 +37,8 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 		if errors.Is(err, consts.ErrFailedToGenerateCode) {
 			httputil.Fail(c, http.StatusInternalServerError, consts.CodeFailedToGenerateCode, consts.ErrFailedToGenerateCode.Error())
 			return
+		} else if errors.Is(err, consts.ErrURLNotAllowed) {
+			httputil.Fail(c, http.StatusBadRequest, consts.CodeURLNotAllowed, consts.ErrURLNotAllowed.Error())
 		} else {
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 			return
@@ -55,6 +57,12 @@ func (h *LinkHandler) GetLinks(c *gin.Context) {
 	}
 
 	req.UserID = c.GetInt64("user_id")
+	if req.PageNum <= 0 {
+		req.PageNum = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
 
 	data, err := h.svc.GetLinks(c.Request.Context(), &req)
 	if err != nil {
@@ -85,6 +93,9 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 	if err := h.svc.UpdateLink(c.Request.Context(), &req); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
+			return
+		} else if errors.Is(err, consts.ErrURLNotAllowed) {
+			httputil.Fail(c, http.StatusBadRequest, consts.CodeURLNotAllowed, consts.ErrURLNotAllowed.Error())
 			return
 		}
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
@@ -168,8 +179,23 @@ func (h *LinkHandler) Redirect(c *gin.Context) {
 
 	originalURL, err := h.svc.Redirect(c.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, consts.ErrInvalidLink) {
+		if errors.Is(err, consts.ErrLinkNotFound) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
+			return
+		} else if errors.Is(err, consts.ErrLinkInactive) {
+			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkInactive, "Link Inactive")
+			return
+		} else if errors.Is(err, consts.ErrLinkExpired) {
+			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkExpired, "Link Expired")
+			return
+		} else if errors.Is(err, consts.ErrLinkPending) {
+			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkPending, "Link Pending")
+			return
+		} else if errors.Is(err, consts.ErrLinkUnsafe) {
+			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkUnsafe, "Link Unsafe")
+			return
+		} else if errors.Is(err, consts.ErrLinkUnknown) {
+			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkUnknown, "Link Unknown")
 			return
 		}
 		httputil.Fail(c, http.StatusInternalServerError, consts.CodeFailedToRedirect, "Failed to redirect")

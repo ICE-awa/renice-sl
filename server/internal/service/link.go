@@ -56,13 +56,26 @@ func NewLinkService(
 	}
 }
 
-func (s *linkService) validateLinkCache(data *dtov1.LinkCache) bool {
-	if data.OriginalURL == consts.NullLink ||
-		data.Status == "inactive" ||
-		(data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
-		return false
+func (s *linkService) validateLinkCache(data *dtov1.LinkCache) error {
+	if data.OriginalURL == consts.NullLink {
+		return consts.ErrLinkNotFound
 	}
-	return true
+	if data.Status == "inactive" {
+		return consts.ErrLinkInactive
+	}
+	if data.Status == "unsafe" {
+		return consts.ErrLinkUnsafe
+	}
+	if data.Status == "pending" {
+		return consts.ErrLinkPending
+	}
+	if data.Status == "unknown" {
+		return consts.ErrLinkUnknown
+	}
+	if data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now()) {
+		return consts.ErrLinkExpired
+	}
+	return nil
 }
 
 func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dtov1.LinkCache, error) {
@@ -88,8 +101,8 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 					slog.String("code", req.Code),
 					slog.String("error", err.Error()))
 			} else {
-				if !s.validateLinkCache(&data) {
-					return nil, consts.ErrInvalidLink
+				if err := s.validateLinkCache(&data); err != nil {
+					return nil, err
 				}
 				return &data, nil
 			}
@@ -117,7 +130,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 							slog.String("error", err.Error()))
 					}
 				}
-				return nil, consts.ErrInvalidLink
+				return nil, consts.ErrLinkNotFound
 			}
 			return nil, err
 		}
@@ -137,8 +150,8 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 		}
 
 		// 随后判断其合法性，若不合法则不放行
-		if !s.validateLinkCache(data) {
-			return nil, consts.ErrInvalidLink
+		if err := s.validateLinkCache(data); err != nil {
+			return nil, err
 		}
 
 		// 若合法则返回 pg 回源链接
@@ -151,7 +164,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 
 	data, ok := value.(*dtov1.LinkCache)
 	if !ok {
-		return nil, consts.ErrInvalidLink
+		return nil, consts.ErrLinkNotFound
 	}
 
 	return data, nil
@@ -183,7 +196,14 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 		return consts.ErrFailedToGenerateCode
 	}
 
-	_, err := s.repo.CreateLink(c, req)
+	// 同步校验 OriginalURL 合法性，仅做基础 ip, 链接格式正确性等防护
+	url, err := util.NormalizeAndValidateURL(c, req.OriginalURL)
+	if err != nil {
+		return consts.ErrURLNotAllowed
+	}
+	req.OriginalURL = url
+
+	_, err = s.repo.CreateLink(c, req)
 	if err != nil {
 		return err
 	}
@@ -198,6 +218,15 @@ func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*dtov
 }
 
 func (s *linkService) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) error {
+	// 同步校验 OriginalURL 合法性，仅做基础 ip, 链接格式正确性等防护
+	if req.OriginalURL != nil {
+		url, err := util.NormalizeAndValidateURL(c, *req.OriginalURL)
+		if err != nil {
+			return consts.ErrURLNotAllowed
+		}
+		req.OriginalURL = &url
+	}
+
 	code, err := s.repo.UpdateLink(c, req)
 	if err != nil {
 		return err
@@ -249,7 +278,7 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
 	// 判断 code 是否一定不存在
 	if !s.bloom.MayContain(req.Code) {
-		return "", consts.ErrInvalidLink
+		return "", consts.ErrLinkNotFound
 	}
 
 	// 如果 code 可能存在 则继续往下走
@@ -275,8 +304,8 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 			cacheMiss = true
 		} else {
 			// 若解析成功，则判断快照是否合法，若合法则继续，不合法则直接返回 ErrInvalidLink
-			if !s.validateLinkCache(&data) {
-				return "", consts.ErrInvalidLink
+			if err := s.validateLinkCache(&data); err != nil {
+				return "", err
 			}
 			originalURL = data.OriginalURL
 		}

@@ -1,23 +1,51 @@
 package mq
 
-import "github.com/nats-io/nats.go"
+import (
+	"errors"
+	"fmt"
+	"github.com/nats-io/nats.go"
+)
 
 const (
 	StreamLinkEvents = "LINK_EVENTS"
 	SubjectLinkAll   = "link.*"
+	StreamDLQ        = "DLQ"
+	SubjectDLQALL    = "dlq.>"
 )
 
-func EnsureStream(client *NatsClient) error {
-	_, err := client.JetStream.StreamInfo(StreamLinkEvents)
+func ensureOneStream(client *NatsClient, cfg *nats.StreamConfig) error {
+	_, err := client.JetStream.StreamInfo(cfg.Name)
 	if err == nil {
 		return nil
 	}
 
-	_, err = client.JetStream.AddStream(&nats.StreamConfig{
-		Name:     StreamLinkEvents,
-		Subjects: []string{SubjectLinkAll},
-		Storage:  nats.FileStorage,
-	})
+	if !errors.Is(err, nats.ErrStreamNotFound) {
+		return err
+	}
 
+	_, err = client.JetStream.AddStream(cfg)
 	return err
+}
+
+func EnsureStream(client *NatsClient) error {
+	streams := []*nats.StreamConfig{
+		{
+			Name:     StreamLinkEvents,
+			Subjects: []string{SubjectLinkAll},
+			Storage:  nats.FileStorage,
+		},
+		{
+			Name:     StreamDLQ,
+			Subjects: []string{SubjectDLQALL},
+			Storage:  nats.FileStorage,
+		},
+	}
+
+	for _, cfg := range streams {
+		if err := ensureOneStream(client, cfg); err != nil {
+			return fmt.Errorf("failed to ensure stream %s: %w", cfg.Name, err)
+		}
+	}
+
+	return nil
 }

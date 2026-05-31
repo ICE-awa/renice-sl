@@ -74,3 +74,9 @@ type LinkCache struct {
 	Status      string     `json:"status"`
 	ExpiresAt   *time.Time `json:"expires_at"`
 }
+
+type CheckLinkReq struct {
+	EventID     string `json:"event_id"`
+	Code        string `json:"code"`
+	OriginalURL string `json:"original_url"`
+}

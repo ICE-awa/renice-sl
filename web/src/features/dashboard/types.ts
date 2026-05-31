@@ -3,7 +3,7 @@ export type LinkItem = {
   original_url: string;
   code: string;
   view_count: number;
-  status: "active" | "inactive";
+  status: string;
   created_at: string;
   updated_at: string;
   expires_at: string;
