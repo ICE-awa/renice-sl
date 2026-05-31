@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
+	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"github.com/nats-io/nats.go"
@@ -56,22 +57,38 @@ func (w *DLQWorker) StartDLQWorker() error {
 				return
 			}
 
+			// 发布 dlq 消息到 DLQ
 			_, err = w.natsClient.JetStream.Publish("dlq."+raw.Subject, data)
 			if err != nil {
 				slog.Warn("Failed to publish DLQ message to NATS",
 					slog.String("error", err.Error()),
 					slog.Any("dlq", dlq))
-				return
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
+			// 将 DLQ Message 记录到数据库
 			err = w.repo.RecordDLQMessage(ctx, &dlq)
 			if err != nil {
 				slog.Warn("Failed to Record DLQ message to database",
 					slog.String("error", err.Error()),
 					slog.Any("dlq", dlq))
+			}
+
+			// 更新 safety_status 为 unknown 放行
+			if raw.Subject == event.SubjectLinkChecked {
+				var req dtov1.CheckLinkReq
+				if err := json.Unmarshal(raw.Data, &req); err == nil {
+					ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel2()
+
+					if err := w.repo.SetSafetyStatusUnknown(ctx2, req.Code); err != nil {
+						slog.Warn("Failed to SetSafetyStatusUnknown",
+							slog.String("error", err.Error()),
+							slog.String("code", req.Code))
+					}
+				}
 			}
 		},
 	)

@@ -6,7 +6,7 @@ CREATE TABLE links (
     view_count BIGINT NOT NULL,
     -- status 可以为 'active', 'inactive'
     status VARCHAR(20) NOT NULL,
-    -- safety_status 可为 'pending', 'safe', 'unsafe'
+    -- safety_status 可为 'pending', 'safe', 'unsafe', 'unknown'
     safety_status VARCHAR(20) NOT NULL DEFAULT 'pending',
     safety_review TEXT,
     safety_checked_at TIMESTAMPTZ,

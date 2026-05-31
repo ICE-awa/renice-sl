@@ -24,14 +24,15 @@ type GetLinksReq struct {
 }
 
 type LinkItem struct {
-	ID          int64      `json:"id"`
-	OriginalURL string     `json:"original_url"`
-	Code        string     `json:"code"`
-	ViewCount   int64      `json:"view_count"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ExpiresAt   *time.Time `json:"expires_at"`
+	ID           int64      `json:"id"`
+	OriginalURL  string     `json:"original_url"`
+	Code         string     `json:"code"`
+	ViewCount    int64      `json:"view_count"`
+	Status       string     `json:"status"`
+	SafetyStatus string     `json:"safety_status"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	ExpiresAt    *time.Time `json:"expires_at"`
 }
 
 type GetLinksResp struct {
@@ -70,9 +71,10 @@ type ClickLinkReq struct {
 }
 
 type LinkCache struct {
-	OriginalURL string     `json:"original_url"`
-	Status      string     `json:"status"`
-	ExpiresAt   *time.Time `json:"expires_at"`
+	OriginalURL  string     `json:"original_url"`
+	Status       string     `json:"status"`
+	SafetyStatus string     `json:"safety_status"`
+	ExpiresAt    *time.Time `json:"expires_at"`
 }
 
 type CheckLinkReq struct {

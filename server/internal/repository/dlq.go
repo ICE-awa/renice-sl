@@ -15,6 +15,7 @@ type DLQRepository interface {
 	GetDLQMessages(context.Context, *dtov1.GetDLQMessagesReq) (*dtov1.GetDLQMessagesResp, error)
 	SetDLQMessageRetrying(context.Context, int64) (*dtov1.RetryDLQMessageData, error)
 	MarkAsResolved(ctx context.Context, id int64) error
+	SetSafetyStatusUnknown(ctx context.Context, code string) error
 }
 
 type dlqRepository struct {
@@ -43,10 +44,10 @@ func (r *dlqRepository) GetDLQMessages(c context.Context, req *dtov1.GetDLQMessa
 	defer cancel()
 
 	tx, err := r.db.Begin(ctx)
-	defer tx.Rollback(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback(ctx)
 
 	// 构造 where 语句
 	whereSQL := ""
@@ -149,8 +150,8 @@ RETURNING subject, payload
 	return &data, nil
 }
 
-func (r *dlqRepository) MarkAsResolved(ctx context.Context, id int64) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+func (r *dlqRepository) MarkAsResolved(c context.Context, id int64) error {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
 	query := `
@@ -160,5 +161,18 @@ WHERE id = $1
 `
 
 	_, err := r.db.Exec(ctx, query, id)
+	return err
+}
+
+func (r *dlqRepository) SetSafetyStatusUnknown(c context.Context, code string) error {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	query := `
+UPDATE links
+SET safety_status = 'unknown'
+WHERE code = $1
+`
+	_, err := r.db.Exec(ctx, query, code)
 	return err
 }

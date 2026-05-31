@@ -3,7 +3,8 @@ export type LinkItem = {
   original_url: string;
   code: string;
   view_count: number;
-  status: string;
+  status: "active" | "inactive";
+  safety_status: "pending" | "unsafe" | "safe" | "unknown";
   created_at: string;
   updated_at: string;
   expires_at: string;
@@ -24,7 +25,7 @@ export type CreateLinkInput = {
 export type GetLinksInput = {
   original_url?: string;
   code?: string;
-  status?: string;
+  status?: "active" | "inactive";
   expires_begin?: string;
   expires_end?: string;
   page_num: number;

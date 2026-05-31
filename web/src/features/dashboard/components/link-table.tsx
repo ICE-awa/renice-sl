@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 type LinkTableProps = {
   items: LinkItem[];
   onEdit: (link: LinkItem) => void;
-  onStatusChange: (id: number, status: string) => void;
+  onStatusChange: (id: number, status: "active" | "inactive") => void;
   onDelete: (link: LinkItem) => void;
 };
 
@@ -82,20 +82,20 @@ export default function LinkTable({
                 className={cn(
                   "block truncate",
                   item.status === "inactive" && "text-red-500",
-                  item.status === "pending" && "text-gray-400",
-                  item.status === "unknown" && "text-gray-400",
-                  item.status === "unsafe" && "text-red-500",
+                  item.safety_status === "pending" && "text-gray-400",
+                  item.safety_status === "unknown" && "text-gray-400",
+                  item.safety_status === "unsafe" && "text-red-500",
                 )}
               >
-                {item.status === "active"
-                  ? "启用"
-                  : item.status === "inactive"
-                    ? "禁用"
-                    : item.status === "pending"
-                      ? "审核中"
-                      : item.status === "unsafe"
-                        ? "不安全"
-                        : "未知状态"}
+                {item.safety_status === "pending"
+                  ? "审核中"
+                  : item.safety_status === "unsafe"
+                    ? "不安全"
+                    : item.safety_status === "unknown"
+                      ? "状态异常"
+                      : item.status === "active"
+                        ? "启用"
+                        : "禁用"}
               </span>
             </TableCell>
             <TableCell>
@@ -111,9 +111,7 @@ export default function LinkTable({
             </TableCell>
             <TableCell>
               <LinkRowActions
-                disabled={
-                  item.status !== "active" && item.status !== "inactive"
-                }
+                disabled={item.safety_status === "pending"}
                 onEdit={() => onEdit?.(item)}
                 onStatusChange={() => onStatusChange?.(item.id, item.status)}
                 onDelete={() => onDelete?.(item)}

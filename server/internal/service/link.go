@@ -63,13 +63,13 @@ func (s *linkService) validateLinkCache(data *dtov1.LinkCache) error {
 	if data.Status == "inactive" {
 		return consts.ErrLinkInactive
 	}
-	if data.Status == "unsafe" {
+	if data.SafetyStatus == "unsafe" {
 		return consts.ErrLinkUnsafe
 	}
-	if data.Status == "pending" {
+	if data.SafetyStatus == "pending" {
 		return consts.ErrLinkPending
 	}
-	if data.Status == "unknown" {
+	if data.SafetyStatus == "unknown" {
 		return consts.ErrLinkUnknown
 	}
 	if data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now()) {
@@ -113,9 +113,10 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 			// 若为空链接
 			if errors.Is(err, pgx.ErrNoRows) {
 				nullLink := &dtov1.LinkCache{
-					OriginalURL: consts.NullLink,
-					Status:      "",
-					ExpiresAt:   nil,
+					OriginalURL:  consts.NullLink,
+					Status:       "",
+					SafetyStatus: "",
+					ExpiresAt:    nil,
 				}
 				// 尝试将此空链接缓存入 Redis 中
 				linkCache, err := json.Marshal(nullLink)
@@ -208,6 +209,19 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 		return err
 	}
 
+	// 异步校验链接的安全性
+	checkReq := &dtov1.CheckLinkReq{
+		EventID:     uuid.NewString(),
+		Code:        req.Code,
+		OriginalURL: req.OriginalURL,
+	}
+	err = s.publisher.PublishLinkChecked(checkReq)
+	if err != nil {
+		slog.Warn("failed to publish link checked event",
+			slog.String("code", req.Code),
+			slog.String("error", err.Error()))
+	}
+
 	// 将 code 添加至布隆过滤器中
 	s.bloom.Add(req.Code)
 	return nil
@@ -230,6 +244,21 @@ func (s *linkService) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) er
 	code, err := s.repo.UpdateLink(c, req)
 	if err != nil {
 		return err
+	}
+
+	// 如果更改了 OriginalURL，则异步校验链接的安全性
+	if req.OriginalURL != nil {
+		checkReq := &dtov1.CheckLinkReq{
+			EventID:     uuid.NewString(),
+			Code:        code,
+			OriginalURL: *req.OriginalURL,
+		}
+		err = s.publisher.PublishLinkChecked(checkReq)
+		if err != nil {
+			slog.Warn("failed to publish link checked event",
+				slog.String("code", code),
+				slog.String("error", err.Error()))
+		}
 	}
 
 	key := consts.RedisLinkCodeKey + code

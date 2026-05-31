@@ -41,7 +41,7 @@ func (r *linkRepository) CreateLink(c context.Context, req *dtov1.CreateLinkReq)
 
 	query := `
 		INSERT INTO links(user_id, original_url, code, expires_at, created_at, updated_at, view_count, status)
-		VALUES ($1, $2, $3, $4, now(), now(), 0, 'pending')
+		VALUES ($1, $2, $3, $4, now(), now(), 0, 'active')
 		RETURNING id
 	`
 
@@ -91,7 +91,7 @@ func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*d
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, original_url, code, view_count, status, created_at, updated_at, expires_at
+SELECT id, original_url, code, view_count, status, safety_status, created_at, updated_at, expires_at
 FROM links
 WHERE %s
 AND deleted_at IS NULL
@@ -151,6 +151,7 @@ LIMIT $%d OFFSET $%d
 			&item.Code,
 			&item.ViewCount,
 			&item.Status,
+			&item.SafetyStatus,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 			&item.ExpiresAt,
@@ -202,6 +203,7 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	argIndex := 2
 	if req.OriginalURL != nil {
 		setClauses = append(setClauses, fmt.Sprintf("original_url = $%d", argIndex))
+		setClauses = append(setClauses, "safety_status = 'pending'", "safety_checked_at = NULL")
 		args = append(args, *req.OriginalURL)
 		argIndex++
 	}
@@ -279,10 +281,10 @@ func (r *linkRepository) GetLinkCacheByCode(c context.Context, code string) (*dt
 	defer cancel()
 
 	query := `
-SELECT original_url, status, expires_at FROM links WHERE code = $1 AND deleted_at IS NULL`
+SELECT original_url, status, safety_status, expires_at FROM links WHERE code = $1 AND deleted_at IS NULL`
 
 	var data dtov1.LinkCache
-	err := r.db.QueryRow(ctx, query, code).Scan(&data.OriginalURL, &data.Status, &data.ExpiresAt)
+	err := r.db.QueryRow(ctx, query, code).Scan(&data.OriginalURL, &data.Status, &data.SafetyStatus, &data.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +425,7 @@ func (r *linkRepository) RecordLinkCheck(ctx context.Context, code string, statu
 
 	query := `
 UPDATE links
-SET status = $1
+SET safety_status = $1, safety_checked_at = NOW()
 WHERE code = $2 AND deleted_at IS NULL
 `
 

@@ -5,10 +5,12 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/internal/worker"
+	"github.com/ICE-awa/renice-sl/shared/cache"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/ICE-awa/renice-sl/shared/database"
 	"github.com/ICE-awa/renice-sl/shared/logger"
 	"github.com/ICE-awa/renice-sl/shared/mq"
+	"github.com/ICE-awa/renice-sl/shared/util"
 	"log/slog"
 	"os"
 )
@@ -52,10 +54,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// redis
+	rdb, err := cache.NewRedis(ctx, cfg.Redis)
+	if err != nil {
+		slog.Error("Failed to connect to Redis",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	// safety browsing
+	safeBrowsingClient := util.NewSafeBrowsingClient(cfg.SafeBrowsing.APIKey)
+
 	linkRepo := repository.NewLinkRepository(db)
 	dlqRepo := repository.NewDLQRepository(db)
 
-	linkService := service.NewLinkEventService(linkRepo, dlqRepo)
+	linkService := service.NewLinkEventService(
+		linkRepo,
+		dlqRepo,
+		rdb,
+		safeBrowsingClient,
+	)
 
 	linkWorker := worker.NewLinkWorker(linkService, natsClient)
 	dlqWorker := worker.NewDLQWorker(natsClient, dlqRepo)

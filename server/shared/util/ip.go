@@ -3,10 +3,13 @@ package util
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
+	"time"
 )
 
 var (
@@ -17,6 +20,7 @@ var (
 	ErrInvalidScheme       = errors.New("only http and https schemes are allowed")
 	ErrEmptyHost           = errors.New("empty host")
 	ErrLocalhostNotAllowed = errors.New("localhost is not allowed")
+	ErrBlockedHost         = errors.New("blocked host")
 )
 
 func mustPrefix(s string) netip.Prefix {
@@ -111,4 +115,48 @@ func NormalizeAndValidateURL(ctx context.Context, raw string) (string, error) {
 	}
 
 	return u.String(), nil
+}
+
+func CheckURLReachable(ctx context.Context, rawURL string) (string, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			if err := validatePublicHost(req.Context(), req.URL.Hostname()); err != nil {
+				return ErrBlockedHost
+			}
+			return nil
+		},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, rawURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; renice-sl/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusMethodNotAllowed {
+		getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("build GET request: %w", err)
+		}
+		getReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; renice-sl/1.0)")
+
+		getResp, err := client.Do(getReq)
+		if err != nil {
+			return "", fmt.Errorf("GET request failed: %w", err)
+		}
+		getResp.Body.Close()
+		return getResp.Request.URL.String(), nil
+	}
+
+	return resp.Request.URL.String(), nil
 }

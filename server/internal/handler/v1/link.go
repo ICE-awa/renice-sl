@@ -39,6 +39,7 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 			return
 		} else if errors.Is(err, consts.ErrURLNotAllowed) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeURLNotAllowed, consts.ErrURLNotAllowed.Error())
+			return
 		} else {
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 			return
