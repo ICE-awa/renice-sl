@@ -1,4 +1,3 @@
-"use client";
 import LinkRowActions from "@/features/dashboard/components/link-row-actions";
 import {
   Table,
@@ -20,6 +19,18 @@ type LinkTableProps = {
 
 const NEXT_PUBLIC_LINK_BASE_URL =
   process.env.NEXT_PUBLIC_LINK_BASE_URL ?? "https://renice.cc/s/";
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  })
+    .format(date)
+    .replace(/\//g, "-");
+}
 
 export default function LinkTable({
   items,
@@ -99,22 +110,26 @@ export default function LinkTable({
               </span>
             </TableCell>
             <TableCell>
-              <span className="block truncate">{item.created_at}</span>
-            </TableCell>
-            <TableCell>
-              <span className="block truncate">{item.updated_at}</span>
+              <span className="block truncate">
+                {formatTime(item.created_at)}
+              </span>
             </TableCell>
             <TableCell>
               <span className="block truncate">
-                {!!item.expires_at ? item.expires_at : "永不过期"}
+                {formatTime(item.updated_at)}
+              </span>
+            </TableCell>
+            <TableCell>
+              <span className="block truncate">
+                {!!item.expires_at ? formatTime(item.expires_at) : "永不过期"}
               </span>
             </TableCell>
             <TableCell>
               <LinkRowActions
                 disabled={item.safety_status === "pending"}
-                onEdit={() => onEdit?.(item)}
-                onStatusChange={() => onStatusChange?.(item.id, item.status)}
-                onDelete={() => onDelete?.(item)}
+                onEdit={() => onEdit(item)}
+                onStatusChange={() => onStatusChange(item.id, item.status)}
+                onDelete={() => onDelete(item)}
                 itemStatus={item.status}
               />
             </TableCell>

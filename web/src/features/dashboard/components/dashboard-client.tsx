@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import LinkSearchBar from "./link-search-bar";
 import CreateLinkDialog from "./create-link-dialog";
 import EditLinkDialog from "./edit-link-dialog";
-import LinkPagination from "./link-pagination";
+import Pagination from "@/components/pagination";
 
 const originalSearchParams: GetLinksInput = {
   page_num: 1,
@@ -276,7 +276,7 @@ export default function DashboardClient() {
         item={editingLink}
       />
       <div className="mt-auto shrink-0">
-        <LinkPagination
+        <Pagination
           total={data.total}
           pageNum={data.page_num}
           pageSize={data.page_size}

@@ -27,6 +27,12 @@ export default function Sidebar() {
       next: "/charts",
       roles: ["admin"],
     },
+    {
+      id: 3,
+      name: "DLQ 消息列表",
+      next: "/dlq",
+      roles: ["admin"],
+    },
   ];
 
   const { user } = useSession();
