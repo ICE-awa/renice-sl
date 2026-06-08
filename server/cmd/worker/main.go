@@ -11,6 +11,8 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/logger"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"github.com/ICE-awa/renice-sl/shared/util"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log/slog"
 	"os"
 )
@@ -96,5 +98,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	select {}
+	r := gin.New()
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	if err := r.Run(":8080"); err != nil {
+		slog.Error("Failed to start HTTP server",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 }

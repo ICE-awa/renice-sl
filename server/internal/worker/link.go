@@ -6,6 +6,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"github.com/nats-io/nats.go"
@@ -34,6 +35,10 @@ func (w *LinkWorker) StartLinkClickWorker() error {
 		event.SubjectLinkClicked,
 		QueueAnalyticsWorker,
 		func(msg *nats.Msg) {
+			start := time.Now()
+			defer func() {
+				metrics.WorkerProcessDurationSeconds.WithLabelValues(event.SubjectLinkClicked).Observe(time.Since(start).Seconds())
+			}()
 			var e *dtov1.ClickLinkReq
 			dlqMessageID := msg.Header.Get(consts.DLQMessageIDHeader)
 
@@ -76,6 +81,10 @@ func (w *LinkWorker) StartLinkCheckWorker() error {
 		event.SubjectLinkChecked,
 		QueueAnalyticsWorker,
 		func(msg *nats.Msg) {
+			start := time.Now()
+			defer func() {
+				metrics.WorkerProcessDurationSeconds.WithLabelValues(event.SubjectLinkChecked).Observe(time.Since(start).Seconds())
+			}()
 			var e *dtov1.CheckLinkReq
 			dlqMessageID := msg.Header.Get(consts.DLQMessageIDHeader)
 

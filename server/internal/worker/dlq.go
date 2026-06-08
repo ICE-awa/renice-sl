@@ -6,6 +6,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"github.com/nats-io/nats.go"
@@ -63,6 +64,8 @@ func (w *DLQWorker) StartDLQWorker() error {
 				slog.Warn("Failed to publish DLQ message to NATS",
 					slog.String("error", err.Error()),
 					slog.Any("dlq", dlq))
+			} else {
+				metrics.DLQMessagesTotal.WithLabelValues(raw.Subject).Inc()
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

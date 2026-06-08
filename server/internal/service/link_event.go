@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/util"
 	"github.com/redis/go-redis/v9"
@@ -77,5 +78,11 @@ func (s *linkEventService) HandleLinkChecked(c context.Context, event *dtov1.Che
 }
 
 func (s *linkEventService) HandleResolvedDLQMessage(c context.Context, messageID int64) error {
-	return s.dlqRepo.MarkAsResolved(c, messageID)
+	subject, err := s.dlqRepo.MarkAsResolved(c, messageID)
+	if err != nil {
+		return err
+	}
+
+	metrics.DLQResolvedTotal.WithLabelValues(subject).Inc()
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"github.com/nats-io/nats.go"
@@ -40,9 +41,20 @@ func (s *dlqService) RetryDLQMessage(c context.Context, id int64) error {
 	msg.Header.Set(consts.DLQMessageIDHeader, strconv.FormatInt(id, 10))
 
 	_, err = s.nc.JetStream.PublishMsg(msg)
-	return err
+	if err != nil {
+		return err
+	}
+
+	metrics.DLQRetryTotal.WithLabelValues(data.Subject).Inc()
+	return nil
 }
 
 func (s *dlqService) MarkAsResolved(c context.Context, id int64) error {
-	return s.repo.MarkAsResolved(c, id)
+	subject, err := s.repo.MarkAsResolved(c, id)
+	if err != nil {
+		return err
+	}
+
+	metrics.DLQResolvedTotal.WithLabelValues(subject).Inc()
+	return nil
 }

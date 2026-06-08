@@ -14,7 +14,7 @@ type DLQRepository interface {
 	RecordDLQMessage(context.Context, *dtov1.DLQMessage) error
 	GetDLQMessages(context.Context, *dtov1.GetDLQMessagesReq) (*dtov1.GetDLQMessagesResp, error)
 	SetDLQMessageRetrying(context.Context, int64) (*dtov1.RetryDLQMessageData, error)
-	MarkAsResolved(ctx context.Context, id int64) error
+	MarkAsResolved(ctx context.Context, id int64) (string, error)
 	SetSafetyStatusUnknown(ctx context.Context, code string) error
 }
 
@@ -150,7 +150,7 @@ RETURNING subject, payload
 	return &data, nil
 }
 
-func (r *dlqRepository) MarkAsResolved(c context.Context, id int64) error {
+func (r *dlqRepository) MarkAsResolved(c context.Context, id int64) (string, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
@@ -158,10 +158,16 @@ func (r *dlqRepository) MarkAsResolved(c context.Context, id int64) error {
 UPDATE dlq_messages
 SET status = 'resolved', resolved_at = NOW()
 WHERE id = $1
+RETURNING subject
 `
 
-	_, err := r.db.Exec(ctx, query, id)
-	return err
+	var subject string
+	err := r.db.QueryRow(ctx, query, id).Scan(&subject)
+	if err != nil {
+		return "", err
+	}
+
+	return subject, nil
 }
 
 func (r *dlqRepository) SetSafetyStatusUnknown(c context.Context, code string) error {

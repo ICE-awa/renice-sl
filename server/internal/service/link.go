@@ -7,6 +7,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/cache"
 	"github.com/ICE-awa/renice-sl/shared/config"
@@ -58,21 +59,27 @@ func NewLinkService(
 
 func (s *linkService) validateLinkCache(data *dtov1.LinkCache) error {
 	if data.OriginalURL == consts.NullLink {
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
 		return consts.ErrLinkNotFound
 	}
 	if data.Status == "inactive" {
+		metrics.RedirectTotal.WithLabelValues("inactive").Inc()
 		return consts.ErrLinkInactive
 	}
 	if data.SafetyStatus == "unsafe" {
+		metrics.RedirectTotal.WithLabelValues("unsafe").Inc()
 		return consts.ErrLinkUnsafe
 	}
 	if data.SafetyStatus == "pending" {
+		metrics.RedirectTotal.WithLabelValues("pending").Inc()
 		return consts.ErrLinkPending
 	}
 	if data.SafetyStatus == "unknown" {
+		metrics.RedirectTotal.WithLabelValues("unknown").Inc()
 		return consts.ErrLinkUnknown
 	}
 	if data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now()) {
+		metrics.RedirectTotal.WithLabelValues("expires").Inc()
 		return consts.ErrLinkExpired
 	}
 	return nil
@@ -102,11 +109,16 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 					slog.String("error", err.Error()))
 			} else {
 				if err := s.validateLinkCache(&data); err != nil {
+					if errors.Is(err, consts.ErrLinkNotFound) {
+						metrics.RedisCacheHitTotal.WithLabelValues("not_found").Inc()
+					}
 					return nil, err
 				}
+				metrics.RedisCacheHitTotal.WithLabelValues("redirect").Inc()
 				return &data, nil
 			}
 		}
+		metrics.RedisCacheMissTotal.WithLabelValues("redirect").Inc()
 
 		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
 		if err != nil {
@@ -165,6 +177,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 
 	data, ok := value.(*dtov1.LinkCache)
 	if !ok {
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
 		return nil, consts.ErrLinkNotFound
 	}
 
@@ -307,6 +320,7 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
 	// 判断 code 是否一定不存在
 	if !s.bloom.MayContain(req.Code) {
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
 		return "", consts.ErrLinkNotFound
 	}
 
@@ -334,9 +348,13 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 		} else {
 			// 若解析成功，则判断快照是否合法，若合法则继续，不合法则直接返回 ErrInvalidLink
 			if err := s.validateLinkCache(&data); err != nil {
+				if errors.Is(err, consts.ErrLinkNotFound) {
+					metrics.RedisCacheHitTotal.WithLabelValues("not_found").Inc()
+				}
 				return "", err
 			}
 			originalURL = data.OriginalURL
+			metrics.RedisCacheHitTotal.WithLabelValues("redirect").Inc()
 		}
 	}
 
@@ -346,7 +364,6 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 		if err != nil {
 			return "", err
 		}
-
 		originalURL = data.OriginalURL
 	}
 
@@ -360,6 +377,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 		}
 	}
 
+	metrics.RedirectTotal.WithLabelValues("success").Inc()
 	return originalURL, nil
 }
 

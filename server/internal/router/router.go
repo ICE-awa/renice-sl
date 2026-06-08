@@ -6,6 +6,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/config"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,6 +17,8 @@ func Setup(
 	userRepo repository.UserRepository,
 ) *gin.Engine {
 	r := gin.New()
+	r.Use(middleware.HTTPMetricsMiddleware())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	public := r.Group("/api")
 	{
