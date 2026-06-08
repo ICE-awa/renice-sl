@@ -14,7 +14,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -38,23 +42,8 @@ func main() {
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}
-
-	// nats
-	natsClient, err := mq.NewNatsClient(cfg.Nats)
-	if err != nil {
-		slog.Error("Failed to connect to NATS",
-			slog.String("error", err.Error()))
-		os.Exit(1)
-	}
-	defer natsClient.Close()
-
-	// jetStream
-	err = mq.EnsureStream(natsClient)
-	if err != nil {
-		slog.Error("Failed to initialize JetStream",
-			slog.String("error", err.Error()))
-		os.Exit(1)
-	}
+	defer db.Close()
+	slog.Info("PostgreSQL Connected")
 
 	// redis
 	rdb, err := cache.NewRedis(ctx, cfg.Redis)
@@ -63,6 +52,26 @@ func main() {
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+	defer rdb.Close()
+	slog.Info("Redis Connected")
+
+	// nats
+	natsClient, err := mq.NewNatsClient(cfg.Nats)
+	if err != nil {
+		slog.Error("Failed to connect to NATS",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	slog.Info("NATS Connected")
+
+	// jetStream
+	err = mq.EnsureStream(natsClient)
+	if err != nil {
+		slog.Error("Failed to initialize JetStream",
+			slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	slog.Info("JetStream Connected")
 
 	// safety browsing
 	safeBrowsingClient := util.NewSafeBrowsingClient(cfg.SafeBrowsing.APIKey)
@@ -97,13 +106,51 @@ func main() {
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+	slog.Info("All Worker Started")
 
 	r := gin.New()
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	if err := r.Run(":8080"); err != nil {
-		slog.Error("Failed to start HTTP server",
-			slog.String("error", err.Error()))
-		os.Exit(1)
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: r,
 	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		slog.Info("worker metrics server listening",
+			slog.String("addr", ":8080"),
+		)
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-serverErr:
+		slog.Error("Worker metrics server failed",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
+
+	case <-ctx.Done():
+		slog.Info("shutdown signal received")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	natsClient.Close()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("failed to shutdown worker metrics server",
+			slog.String("error", err.Error()),
+		)
+		_ = srv.Close()
+	}
+
+	slog.Info("worker stopped")
 }

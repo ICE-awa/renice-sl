@@ -5,6 +5,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/service"
 	"github.com/ICE-awa/renice-sl/shared/httputil"
 	"github.com/gin-gonic/gin"
+	"log/slog"
 	"strconv"
 )
 
@@ -32,6 +33,11 @@ func (h *DLQHandler) GetDLQMessages(c *gin.Context) {
 
 	messages, err := h.svc.GetDLQMessages(c.Request.Context(), &req)
 	if err != nil {
+		slog.Error("get dlq messages request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "DLQHandler.GetDLQMessages"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -49,6 +55,11 @@ func (h *DLQHandler) RetryDLQMessage(c *gin.Context) {
 
 	err = h.svc.RetryDLQMessage(c.Request.Context(), int64(id))
 	if err != nil {
+		slog.Error("retry dlq message request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "DLQHandler.RetryDLQMessage"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -66,6 +77,11 @@ func (h *DLQHandler) MarkAsResolved(c *gin.Context) {
 
 	err = h.svc.MarkAsResolved(c.Request.Context(), int64(id))
 	if err != nil {
+		slog.Error("mark as resolved request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "DLQHandler.MarkAsResolved"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}

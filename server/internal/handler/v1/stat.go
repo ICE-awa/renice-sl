@@ -32,8 +32,11 @@ func (h *StatHandler) GetLinkStats(c *gin.Context) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
 			return
 		}
-		slog.Warn("failed to get link stats",
-			slog.String("error", err.Error()))
+		slog.Error("get link stats request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "StatHandler.GetLinkStats"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -54,8 +57,11 @@ func (h *StatHandler) GetClickStats(c *gin.Context) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
 			return
 		}
-		slog.Warn("failed to get click stats",
-			slog.String("error", err.Error()))
+		slog.Error("get click stats request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "StatHandler.GetClickStats"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -76,8 +82,11 @@ func (h *StatHandler) GetUserStats(c *gin.Context) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidBucket, "Invalid bucket")
 			return
 		}
-		slog.Warn("failed to get user stats",
-			slog.String("error", err.Error()))
+		slog.Error("get user stats request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "StatHandler.GetUserStats"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}

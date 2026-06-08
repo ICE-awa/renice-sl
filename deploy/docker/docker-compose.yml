@@ -1,5 +1,6 @@
 services:
   renice-sl-api:
+    stop_grace_period: 30s
     container_name: renice-sl-api
     build: ../../server/.
     command: [./api]
@@ -21,6 +22,7 @@ services:
       retries: 5
 
   renice-sl-worker:
+    stop_grace_period: 45s
     container_name: renice-sl-worker
     build: ../../server/.
     command: ["./worker"]

@@ -8,6 +8,7 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/httputil"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"log/slog"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -41,6 +42,11 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeURLNotAllowed, consts.ErrURLNotAllowed.Error())
 			return
 		} else {
+			slog.Error("create link request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "LinkHandler.CreateLink"),
+				slog.String("error", err.Error()),
+			)
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 			return
 		}
@@ -67,6 +73,11 @@ func (h *LinkHandler) GetLinks(c *gin.Context) {
 
 	data, err := h.svc.GetLinks(c.Request.Context(), &req)
 	if err != nil {
+		slog.Error("get links request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "LinkHandler.GetLinks"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -99,6 +110,11 @@ func (h *LinkHandler) UpdateLink(c *gin.Context) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeURLNotAllowed, consts.ErrURLNotAllowed.Error())
 			return
 		}
+		slog.Error("update link request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "LinkHandler.UpdateLink"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -123,6 +139,11 @@ func (h *LinkHandler) GetLinkByID(c *gin.Context) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		} else {
+			slog.Error("get link by id request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "LinkHandler.GetLinkByID"),
+				slog.String("error", err.Error()),
+			)
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 			return
 		}
@@ -149,6 +170,11 @@ func (h *LinkHandler) DeleteLink(c *gin.Context) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeLinkNotFound, "Link Not Found")
 			return
 		}
+		slog.Error("delete link request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "LinkHandler.DeleteLink"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
@@ -199,6 +225,11 @@ func (h *LinkHandler) Redirect(c *gin.Context) {
 			httputil.Fail(c, http.StatusForbidden, consts.CodeLinkUnknown, "Link Unknown")
 			return
 		}
+		slog.Error("redirect request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "LinkHandler.Redirect"),
+			slog.String("error", err.Error()),
+		)
 		httputil.Fail(c, http.StatusInternalServerError, consts.CodeFailedToRedirect, "Failed to redirect")
 		return
 	}
@@ -211,6 +242,11 @@ func (h *LinkHandler) GetStats(c *gin.Context) {
 
 	resp, err := h.svc.GetStats(c.Request.Context(), userID)
 	if err != nil {
+		slog.Error("get stats request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "LinkHandler.GetStats"),
+			slog.String("error", err.Error()),
+		)
 		httputil.InternalServerError(c, "Failed to get stats")
 		return
 	}
