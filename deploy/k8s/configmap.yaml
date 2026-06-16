@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renice-sl-config
+  namespace: renice-sl
+data:
+  BACKEND_URL: "http://renice-sl-api:8080"
+  SERVER_PORT: "8080"
+  SERVER_MODE: "production"
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  DATABASE_SSLMODE: "disable"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_POOL_SIZE: "20"
+  NATS_HOST: "nats"
+  JWT_ACCESS_EXPIRES: "15m"
+  JWT_REFRESH_EXPIRES: "168h"
+  LINK_EXPIRES: "30m"
+  LINK_NULL_EXPIRES: "45s"

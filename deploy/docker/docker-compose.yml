@@ -1,4 +1,24 @@
 services:
+  renice-sl-migrate:
+    build: ../../server/.
+    command: ["./migrate", "up"]
+    env_file:
+      ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  renice-sl-web:
+    build: ../../web/.
+    container_name: renice-sl-web
+    ports:
+      - "58080:3000"
+    environment:
+      BACKEND_URL: http://renice-sl-api:8080
+    depends_on:
+      renice-sl-api:
+        condition: service_healthy
+
   renice-sl-api:
     stop_grace_period: 30s
     container_name: renice-sl-api
@@ -6,9 +26,10 @@ services:
     command: [./api]
     ports:
       - "58000:8080"
-    env_file:
-      ./.env
+    env_file: ./.env
     depends_on:
+      renice-sl-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -43,20 +64,24 @@ services:
       POSTGRES_USER: ${DATABASE_USER:-renice}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-renice_ice_can_do_this}
       POSTGRES_DB: ${DATABASE_DBNAME:-renice_sl}
-#    command:
-#      - postgres
-#      - -c
-#      - shared_preload_libraries=pg_stat_statements
-#      - -c
-#      - pg_stat_statements.track=all
-#      - -c
-#      - compute_query_id=on
+    #    command:
+    #      - postgres
+    #      - -c
+    #      - shared_preload_libraries=pg_stat_statements
+    #      - -c
+    #      - pg_stat_statements.track=all
+    #      - -c
+    #      - compute_query_id=on
     ports:
       - "58001:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_DBNAME}'"]
+      test:
+        [
+          "CMD-SHELL",
+          "sh -c 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_DBNAME}'",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5

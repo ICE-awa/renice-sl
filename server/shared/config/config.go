@@ -43,8 +43,8 @@ type NatsConfig struct {
 }
 
 type JwtConfig struct {
-	AccessSecret   string        `mapstructure:"access_token"`
-	RefreshSecret  string        `mapstructure:"refresh_token"`
+	AccessSecret   string        `mapstructure:"access_secret"`
+	RefreshSecret  string        `mapstructure:"refresh_secret"`
 	AccessExpires  time.Duration `mapstructure:"access_expires"`
 	RefreshExpires time.Duration `mapstructure:"refresh_expires"`
 }
