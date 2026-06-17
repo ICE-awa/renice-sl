@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { GetDLQMessagesResponse, GetDLQMessagesParams } from "./types";
 
 export function getDLQMessages(params: GetDLQMessagesParams) {
   const searchParams = new URLSearchParams();
