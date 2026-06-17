@@ -33,3 +33,24 @@ jobs:
           tags: |
             ghcr.io/ice-awa/renice-sl-web:${{ github.ref_name }}
             ghcr.io/ice-awa/renice-sl-web:latest
+
+  deploy:
+    runs-on: [ self-hosted, linux, renice-sl ]
+    needs: build
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: |
+          kubectl set image deployment/renice-sl-server \
+            renice-sl-server=ghcr.io/ice-awa/renice-sl-server:${{ github.ref_name }} \
+            -n renice-sl
+          
+          kubectl set image deployment/renice-sl-web \
+            renice-sl-web=ghcr.io/ice-awa/renice-sl-web:${{ github.ref_name }} \
+            -n renice-sl
+          
+          kubectl rollout status deployment/renice-sl-api -n renice-sl
+          kubectl rollout status deployment/renice-sl-worker -n renice-sl
+          kubectl rollout status deployment/renice-sl-web -n renice-sl
