@@ -9,7 +9,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate
-          image: renice-sl-server:latest
+          image: ghcr.io/ice-awa/renice-sl-server:latest
           command: ["./migrate", "up"]
           envFrom:
             - configMapRef:

@@ -1,6 +1,6 @@
 services:
   renice-sl-migrate:
-    build: ../../server/.
+    image: ghcr.io/ice-awa/renice-sl-server:latest
     command: ["./migrate", "up"]
     env_file:
       ./.env
@@ -9,7 +9,7 @@ services:
         condition: service_healthy
 
   renice-sl-web:
-    build: ../../web/.
+    image: ghcr.io/ice-awa/renice-sl-web:latest
     container_name: renice-sl-web
     ports:
       - "58080:3000"
@@ -22,7 +22,7 @@ services:
   renice-sl-api:
     stop_grace_period: 30s
     container_name: renice-sl-api
-    build: ../../server/.
+    image: ghcr.io/ice-awa/renice-sl-server:latest
     command: [./api]
     ports:
       - "58000:8080"
@@ -45,7 +45,7 @@ services:
   renice-sl-worker:
     stop_grace_period: 45s
     container_name: renice-sl-worker
-    build: ../../server/.
+    image: ghcr.io/ice-awa/renice-sl-server:latest
     command: ["./worker"]
     env_file:
       - ./.env

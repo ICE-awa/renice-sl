@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: renice-sl-worker
-          image: renice-sl-server:latest
+          image: ghcr.io/ice-awa/renice-sl-server:latest
           imagePullPolicy: IfNotPresent
           command: ["./worker"]
           envFrom:
