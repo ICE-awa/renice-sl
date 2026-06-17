@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ICE-awa/renice-sl/internal/event"
 	"github.com/ICE-awa/renice-sl/internal/handler"
@@ -15,7 +16,11 @@ import (
 	"github.com/ICE-awa/renice-sl/shared/logger"
 	"github.com/ICE-awa/renice-sl/shared/mq"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -39,6 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+	slog.Info("Postgres Connected")
 
 	// redis
 	rdb, err := cache.NewRedis(ctx, cfg.Redis)
@@ -48,6 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer rdb.Close()
+	slog.Info("Redis Connected")
 
 	// nats
 	natsClient, err := mq.NewNatsClient(cfg.Nats)
@@ -57,6 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer natsClient.Close()
+	slog.Info("NATS Connected")
 
 	// jetstream
 	err = mq.EnsureStream(natsClient)
@@ -65,6 +73,7 @@ func main() {
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+	slog.Info("JetStream Connected")
 
 	// 布隆过滤器
 	bloom := cache.NewBloomFilter(100_000, 0.01)
@@ -77,11 +86,15 @@ func main() {
 
 	linkPublisher := event.NewLinkPublisher(natsClient)
 
-	authRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
+	statRepo := repository.NewStatRepository(db)
+	dlqRepo := repository.NewDLQRepository(db)
 
-	authSvc := service.NewAuthService(authRepo, rdb, &cfg.Jwt)
+	authSvc := service.NewAuthService(userRepo, rdb, &cfg.Jwt)
 	linkSvc := service.NewLinkService(linkRepo, linkPublisher, rdb, &cfg.Link, bloom)
+	statSvc := service.NewStatService(statRepo)
+	dlqSvc := service.NewDLQService(dlqRepo, natsClient)
 
 	// 布隆过滤器初始化
 	err = linkSvc.InitBloomFilter()
@@ -95,9 +108,11 @@ func main() {
 		HealthH: handler.NewHealthHandler(db, rdb, natsClient),
 		AuthHV1: handlerv1.NewAuthHandler(authSvc, &cfg.Jwt),
 		LinkHV1: handlerv1.NewLinkHandler(linkSvc),
+		StatHV1: handlerv1.NewStatHandler(statSvc),
+		DLQHV1:  handlerv1.NewDLQHandler(dlqSvc),
 	}
 
-	r := router.Setup(h, &cfg.Jwt, rdb)
+	r := router.Setup(h, &cfg.Jwt, rdb, userRepo)
 
 	err = r.SetTrustedProxies([]string{
 		"10.0.0.0/8",
@@ -108,42 +123,46 @@ func main() {
 		panic(err)
 	}
 
-	if err := r.Run(port); err != nil {
-		slog.Error("Error occurred while server starting",
-			slog.Int("port", cfg.Server.Port),
-			slog.String("mode", cfg.Server.Mode),
-			slog.String("error", err.Error()))
+	srv := &http.Server{
+		Addr:    port,
+		Handler: r,
 	}
 
-}
+	serverErr := make(chan error, 1)
 
-//func startPGPoolStatsLogger(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
-//	ticker := time.NewTicker(interval)
-//
-//	go func() {
-//		defer ticker.Stop()
-//
-//		for {
-//			select {
-//			case <-ctx.Done():
-//				return
-//
-//			case <-ticker.C:
-//				s := pool.Stat()
-//
-//				log.Printf(
-//					"pgpool max=%d total=%d acquired=%d idle=%d constructing=%d acquire_count=%d empty_acquire=%d acquire_duration=%s canceled_acquire=%d",
-//					s.MaxConns(),
-//					s.TotalConns(),
-//					s.AcquiredConns(),
-//					s.IdleConns(),
-//					s.ConstructingConns(),
-//					s.AcquireCount(),
-//					s.EmptyAcquireCount(),
-//					s.AcquireDuration(),
-//					s.CanceledAcquireCount(),
-//				)
-//			}
-//		}
-//	}()
-//}
+	go func() {
+		slog.Info("api server listening",
+			slog.String("port", port),
+		)
+
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-serverErr:
+		slog.Error("api server failed",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
+
+	case <-ctx.Done():
+		slog.Info("shutdown signal received")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("failed to shutdown api server",
+			slog.String("error", err.Error()),
+		)
+		_ = srv.Close()
+	}
+
+	slog.Info("api server stopped")
+}

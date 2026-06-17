@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renice-sl-worker
+  namespace: renice-sl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: renice-sl-worker
+  template:
+    metadata:
+      labels:
+        app: renice-sl-worker
+    spec:
+      containers:
+        - name: renice-sl-worker
+          image: renice-sl-server:latest
+          imagePullPolicy: IfNotPresent
+          command: ["./worker"]
+          envFrom:
+            - configMapRef:
+                name: renice-sl-config
+            - secretRef:
+                name: renice-sl-secret
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: renice-sl-worker
+  namespace: renice-sl
+spec:
+  selector:
+    app: renice-sl-worker
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

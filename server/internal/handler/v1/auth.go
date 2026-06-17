@@ -38,8 +38,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		} else if errors.Is(err, consts.ErrInvalidEmailCode) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidEmailCode, "Invalid email code")
 		} else {
-			slog.Error("[handler] Internal Server Error in Register",
-				slog.String("error", err.Error()))
+			slog.Error("register request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "AuthHandler.Register"),
+				slog.String("error", err.Error()),
+			)
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		}
 		return
@@ -63,8 +66,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		} else if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidPassword, "Invalid Password")
 		} else {
-			slog.Error("[handler] Internal Server Error in Login",
-				slog.String("error", err.Error()))
+			slog.Error("login request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "AuthHandler.Login"),
+				slog.String("error", err.Error()),
+			)
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		}
 		return
@@ -110,6 +116,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		if errors.Is(err, consts.ErrInvalidRefreshToken) {
 			httputil.Fail(c, http.StatusBadRequest, consts.CodeInvalidRefreshToken, "Invalid refresh token")
 		} else {
+			slog.Error("refresh request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "AuthHandler.Refresh"),
+				slog.String("error", err.Error()),
+			)
 			httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		}
 		return
@@ -148,7 +159,12 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	err := h.svc.Logout(c.Request.Context(), userID)
 	if err != nil {
-		httputil.Fail(c, http.StatusInternalServerError, consts.CodeInternalServerError, "Server Temporarily Unavailable")
+		slog.Error("logout request failed",
+			slog.String("request_id", c.GetString("X-Request-ID")),
+			slog.String("handler", "AuthHandler.Logout"),
+			slog.String("error", err.Error()),
+		)
+		httputil.InternalServerError(c, "Server Temporarily Unavailable")
 		return
 	}
 
@@ -183,6 +199,11 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.Fail(c, http.StatusNotFound, consts.CodeUserNotFound, "User not found")
 		} else {
+			slog.Error("me request failed",
+				slog.String("request_id", c.GetString("X-Request-ID")),
+				slog.String("handler", "AuthHandler.Me"),
+				slog.String("error", err.Error()),
+			)
 			httputil.Fail(c, http.StatusInternalServerError, consts.CodeInternalServerError, "Server Temporarily Unavailable")
 		}
 		return

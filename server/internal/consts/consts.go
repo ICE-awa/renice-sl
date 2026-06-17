@@ -1,7 +1,9 @@
 package consts
 
 const (
-	RoleUser  string = "user"
-	RoleAdmin string = "admin"
-	NullLink  string = "__NULL__"
+	RoleUser               = "user"
+	RoleAdmin              = "admin"
+	NullLink               = "__NULL__"
+	NATSMaxDeliverAdvisory = "$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.>"
+	DLQMessageIDHeader     = "X-DLQ-Message-ID"
 )

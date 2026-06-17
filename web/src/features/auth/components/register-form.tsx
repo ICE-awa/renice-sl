@@ -12,12 +12,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { register } from "../api";
+import { refresh, register } from "../api";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import Link from "next/link";
 import { RegisterConflictResp } from "../types";
+import { useEffect } from "react";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -55,12 +56,28 @@ export function RegisterForm() {
           return;
         }
       }
+      toast.error("请检查表单项是否正确填写");
     }
   }
 
   async function onSendCode() {
     // TODO 后续添加发送验证码的功能
   }
+
+  useEffect(() => {
+    let alive = true;
+
+    refresh()
+      .then(() => {
+        if (!alive) return;
+        router.replace("/dashboard");
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   return (
     <Card className="w-full max-w-sm">

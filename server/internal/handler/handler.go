@@ -6,4 +6,6 @@ type Handlers struct {
 	HealthH *HealthHandler
 	AuthHV1 *v1.AuthHandler
 	LinkHV1 *v1.LinkHandler
+	StatHV1 *v1.StatHandler
+	DLQHV1  *v1.DLQHandler
 }

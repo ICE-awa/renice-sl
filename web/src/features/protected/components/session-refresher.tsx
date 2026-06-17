@@ -2,17 +2,15 @@
 
 import { refresh } from "@/features/auth/api";
 import { useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect } from "react";
 import { clearScheduledRefresh, scheduleRefresh } from "./session";
 
-export default function ProtectedSession({
+export default function SessionRefresher({
   children,
 }: {
   children: ReactNode;
 }) {
   const router = useRouter();
-
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -21,10 +19,8 @@ export default function ProtectedSession({
       .then((resp) => {
         if (!alive) return;
         scheduleRefresh(resp.expires_in);
-        setReady(true);
       })
-      .catch((err) => {
-        console.warn("[auth] 初始化 refresh 计划失败", err);
+      .catch(() => {
         clearScheduledRefresh();
         router.replace("/login");
       });
@@ -34,14 +30,6 @@ export default function ProtectedSession({
       clearScheduledRefresh();
     };
   }, [router]);
-
-  if (!ready) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        loading...
-      </div>
-    );
-  }
 
   return <>{children}</>;
 }

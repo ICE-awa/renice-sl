@@ -10,3 +10,4 @@ CREATE TABLE IF NOT EXISTS click_log (
 
 CREATE INDEX idx_click_log_code ON click_log(code);
 CREATE UNIQUE INDEX idx_click_log_event_id ON click_log(event_id);
+CREATE INDEX idx_click_log_clicked_at ON click_log(clicked_at);

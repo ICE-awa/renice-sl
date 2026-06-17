@@ -7,13 +7,15 @@ import {
 import { Button } from "@/components/ui/button";
 
 type LinkRowActionsProps = {
+  disabled?: boolean;
   onEdit: () => void;
   onStatusChange: () => void;
   onDelete: () => void;
-  itemStatus: "active" | "inactive";
+  itemStatus: string;
 };
 
 export default function LinkRowActions({
+  disabled,
   onEdit,
   onStatusChange,
   onDelete,
@@ -22,7 +24,7 @@ export default function LinkRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="default">
+        <Button size="sm" variant="default" disabled={disabled}>
           ...
         </Button>
       </DropdownMenuTrigger>

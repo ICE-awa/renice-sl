@@ -4,15 +4,10 @@ export type LinkItem = {
   code: string;
   view_count: number;
   status: "active" | "inactive";
+  safety_status: "pending" | "unsafe" | "safe" | "unknown";
   created_at: string;
   updated_at: string;
   expires_at: string;
-};
-
-export type SidebarItems = {
-  id: number;
-  name: string;
-  next: string;
 };
 
 // Api Request
@@ -30,7 +25,7 @@ export type CreateLinkInput = {
 export type GetLinksInput = {
   original_url?: string;
   code?: string;
-  status?: string;
+  status?: "active" | "inactive";
   expires_begin?: string;
   expires_end?: string;
   page_num: number;
@@ -56,4 +51,11 @@ export type UpdateLinkInput = {
 export type GetStatsResponse = {
   link_count: number;
   view_count: number;
+};
+
+export type GetLinksResponse = {
+  total: number;
+  page_num: number;
+  page_size: number;
+  links: LinkItem[];
 };

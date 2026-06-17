@@ -12,6 +12,7 @@ import { clearScheduledRefresh } from "@/features/protected/components/session";
 import { ApiError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useSession } from "./session-provider";
 
 function getGreeting(hour: number) {
   if (hour >= 5 && hour < 11) return "早上好";
@@ -21,12 +22,10 @@ function getGreeting(hour: number) {
   else return "夜深了";
 }
 
-type UserMenuProps = {
-  user: string;
-};
-
-export function UserMenu({ user }: UserMenuProps) {
+export function UserMenu() {
   const hour = new Date().getHours();
+
+  const { user } = useSession();
 
   const router = useRouter();
 
@@ -48,10 +47,12 @@ export function UserMenu({ user }: UserMenuProps) {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="w-full justify-between">
             <Avatar>
-              <AvatarFallback>I</AvatarFallback>
+              <AvatarFallback>
+                {user.username !== undefined ? user.username.charAt(0) : "I"}
+              </AvatarFallback>
             </Avatar>
             <span>
-              {getGreeting(hour)} ! {user}
+              {getGreeting(hour)} {user.username}
             </span>
           </Button>
         </DropdownMenuTrigger>

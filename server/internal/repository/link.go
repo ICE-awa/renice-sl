@@ -15,7 +15,7 @@ import (
 
 type LinkRepository interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) (int64, error)
-	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
+	GetLinks(context.Context, *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) (string, error)
 	GetLinkByID(context.Context, int64, int64) (*model.Link, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) (string, error)
@@ -25,6 +25,7 @@ type LinkRepository interface {
 	GetViewCountByUserID(context.Context, int64) (int64, error)
 	GetLinkCountByUserID(context.Context, int64) (int64, error)
 	GetAllLinkCodes(context.Context) ([]string, error)
+	RecordLinkCheck(ctx context.Context, code string, status string) error
 }
 type linkRepository struct {
 	db *pgxpool.Pool
@@ -53,7 +54,7 @@ func (r *linkRepository) CreateLink(c context.Context, req *dtov1.CreateLinkReq)
 	return id, nil
 }
 
-func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error) {
+func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
@@ -90,7 +91,7 @@ func (r *linkRepository) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, original_url, code, view_count, status, created_at, updated_at, expires_at
+SELECT id, original_url, code, view_count, status, safety_status, created_at, updated_at, expires_at
 FROM links
 WHERE %s
 AND deleted_at IS NULL
@@ -101,9 +102,16 @@ LIMIT $%d OFFSET $%d
 		argIndex,
 		argIndex+1)
 
+	totalArgs := args
 	args = append(args, req.PageSize, (req.PageNum-1)*req.PageSize)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +151,7 @@ LIMIT $%d OFFSET $%d
 			&item.Code,
 			&item.ViewCount,
 			&item.Status,
+			&item.SafetyStatus,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 			&item.ExpiresAt,
@@ -157,7 +166,32 @@ LIMIT $%d OFFSET $%d
 		return nil, err
 	}
 
-	return links, nil
+	queryTotal := fmt.Sprintf(`
+SELECT count(*) 
+FROM links 
+WHERE %s
+AND deleted_at IS NULL
+`,
+		strings.Join(whereClauses, " AND "))
+	var total int64
+	err = tx.QueryRow(ctx, queryTotal, totalArgs...).Scan(&total)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &dtov1.GetLinksResp{
+		Total:    total,
+		PageNum:  req.PageNum,
+		PageSize: req.PageSize,
+		Links:    links,
+	}
+
+	return data, nil
 }
 
 func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) (string, error) {
@@ -169,6 +203,7 @@ func (r *linkRepository) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq)
 	argIndex := 2
 	if req.OriginalURL != nil {
 		setClauses = append(setClauses, fmt.Sprintf("original_url = $%d", argIndex))
+		setClauses = append(setClauses, "safety_status = 'pending'", "safety_checked_at = NULL")
 		args = append(args, *req.OriginalURL)
 		argIndex++
 	}
@@ -246,10 +281,10 @@ func (r *linkRepository) GetLinkCacheByCode(c context.Context, code string) (*dt
 	defer cancel()
 
 	query := `
-SELECT original_url, status, expires_at FROM links WHERE code = $1 AND deleted_at IS NULL`
+SELECT original_url, status, safety_status, expires_at FROM links WHERE code = $1 AND deleted_at IS NULL`
 
 	var data dtov1.LinkCache
-	err := r.db.QueryRow(ctx, query, code).Scan(&data.OriginalURL, &data.Status, &data.ExpiresAt)
+	err := r.db.QueryRow(ctx, query, code).Scan(&data.OriginalURL, &data.Status, &data.SafetyStatus, &data.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -365,6 +400,7 @@ SELECT code FROM links WHERE deleted_at IS NULL
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	codes, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
 		var code string
@@ -381,4 +417,18 @@ SELECT code FROM links WHERE deleted_at IS NULL
 	}
 
 	return codes, nil
+}
+
+func (r *linkRepository) RecordLinkCheck(ctx context.Context, code string, status string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+UPDATE links
+SET safety_status = $1, safety_checked_at = NOW()
+WHERE code = $2 AND deleted_at IS NULL
+`
+
+	_, err := r.db.Exec(ctx, query, status, code)
+	return err
 }

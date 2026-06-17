@@ -28,6 +28,7 @@ func NewNatsClient(cfg config.NatsConfig) (*NatsClient, error) {
 		nats.ClosedHandler(func(nc *nats.Conn) {
 			slog.Info("NATS Closed")
 		}),
+		nats.DrainTimeout(30 * time.Second),
 	}
 
 	url := fmt.Sprintf("nats://%s:4222", cfg.Host)

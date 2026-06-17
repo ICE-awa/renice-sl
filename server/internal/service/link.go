@@ -7,6 +7,7 @@ import (
 	"github.com/ICE-awa/renice-sl/internal/consts"
 	dtov1 "github.com/ICE-awa/renice-sl/internal/dto/v1"
 	"github.com/ICE-awa/renice-sl/internal/event"
+	"github.com/ICE-awa/renice-sl/internal/metrics"
 	"github.com/ICE-awa/renice-sl/internal/repository"
 	"github.com/ICE-awa/renice-sl/shared/cache"
 	"github.com/ICE-awa/renice-sl/shared/config"
@@ -22,7 +23,7 @@ import (
 
 type LinkService interface {
 	CreateLink(context.Context, *dtov1.CreateLinkReq) error
-	GetLinks(context.Context, *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error)
+	GetLinks(context.Context, *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error)
 	UpdateLink(context.Context, *dtov1.UpdateLinkReq) error
 	GetLinkByID(context.Context, int64, int64) (*dtov1.LinkItem, error)
 	DeleteLink(context.Context, *dtov1.DeleteLinkReq) error
@@ -56,13 +57,32 @@ func NewLinkService(
 	}
 }
 
-func (s *linkService) validateLinkCache(data *dtov1.LinkCache) bool {
-	if data.OriginalURL == consts.NullLink ||
-		data.Status == "inactive" ||
-		(data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now())) {
-		return false
+func (s *linkService) validateLinkCache(data *dtov1.LinkCache) error {
+	if data.OriginalURL == consts.NullLink {
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
+		return consts.ErrLinkNotFound
 	}
-	return true
+	if data.Status == "inactive" {
+		metrics.RedirectTotal.WithLabelValues("inactive").Inc()
+		return consts.ErrLinkInactive
+	}
+	if data.SafetyStatus == "unsafe" {
+		metrics.RedirectTotal.WithLabelValues("unsafe").Inc()
+		return consts.ErrLinkUnsafe
+	}
+	if data.SafetyStatus == "pending" {
+		metrics.RedirectTotal.WithLabelValues("pending").Inc()
+		return consts.ErrLinkPending
+	}
+	if data.SafetyStatus == "unknown" {
+		metrics.RedirectTotal.WithLabelValues("unknown").Inc()
+		return consts.ErrLinkUnknown
+	}
+	if data.ExpiresAt != nil && data.ExpiresAt.Before(time.Now()) {
+		metrics.RedirectTotal.WithLabelValues("expires").Inc()
+		return consts.ErrLinkExpired
+	}
+	return nil
 }
 
 func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dtov1.LinkCache, error) {
@@ -88,21 +108,27 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 					slog.String("code", req.Code),
 					slog.String("error", err.Error()))
 			} else {
-				if !s.validateLinkCache(&data) {
-					return nil, consts.ErrInvalidLink
+				if err := s.validateLinkCache(&data); err != nil {
+					if errors.Is(err, consts.ErrLinkNotFound) {
+						metrics.RedisCacheHitTotal.WithLabelValues("not_found").Inc()
+					}
+					return nil, err
 				}
+				metrics.RedisCacheHitTotal.WithLabelValues("redirect").Inc()
 				return &data, nil
 			}
 		}
+		metrics.RedisCacheMissTotal.WithLabelValues("redirect").Inc()
 
 		data, err := s.repo.GetLinkCacheByCode(c, req.Code)
 		if err != nil {
 			// 若为空链接
 			if errors.Is(err, pgx.ErrNoRows) {
 				nullLink := &dtov1.LinkCache{
-					OriginalURL: consts.NullLink,
-					Status:      "",
-					ExpiresAt:   nil,
+					OriginalURL:  consts.NullLink,
+					Status:       "",
+					SafetyStatus: "",
+					ExpiresAt:    nil,
 				}
 				// 尝试将此空链接缓存入 Redis 中
 				linkCache, err := json.Marshal(nullLink)
@@ -117,7 +143,7 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 							slog.String("error", err.Error()))
 					}
 				}
-				return nil, consts.ErrInvalidLink
+				return nil, consts.ErrLinkNotFound
 			}
 			return nil, err
 		}
@@ -137,8 +163,8 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 		}
 
 		// 随后判断其合法性，若不合法则不放行
-		if !s.validateLinkCache(data) {
-			return nil, consts.ErrInvalidLink
+		if err := s.validateLinkCache(data); err != nil {
+			return nil, err
 		}
 
 		// 若合法则返回 pg 回源链接
@@ -151,7 +177,8 @@ func (s *linkService) cacheLink(c context.Context, req *dtov1.ClickLinkReq) (*dt
 
 	data, ok := value.(*dtov1.LinkCache)
 	if !ok {
-		return nil, consts.ErrInvalidLink
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
+		return nil, consts.ErrLinkNotFound
 	}
 
 	return data, nil
@@ -183,9 +210,29 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 		return consts.ErrFailedToGenerateCode
 	}
 
-	_, err := s.repo.CreateLink(c, req)
+	// 同步校验 OriginalURL 合法性，仅做基础 ip, 链接格式正确性等防护
+	url, err := util.NormalizeAndValidateURL(c, req.OriginalURL)
+	if err != nil {
+		return consts.ErrURLNotAllowed
+	}
+	req.OriginalURL = url
+
+	_, err = s.repo.CreateLink(c, req)
 	if err != nil {
 		return err
+	}
+
+	// 异步校验链接的安全性
+	checkReq := &dtov1.CheckLinkReq{
+		EventID:     uuid.NewString(),
+		Code:        req.Code,
+		OriginalURL: req.OriginalURL,
+	}
+	err = s.publisher.PublishLinkChecked(checkReq)
+	if err != nil {
+		slog.Warn("failed to publish link checked event",
+			slog.String("code", req.Code),
+			slog.String("error", err.Error()))
 	}
 
 	// 将 code 添加至布隆过滤器中
@@ -193,14 +240,38 @@ func (s *linkService) CreateLink(c context.Context, req *dtov1.CreateLinkReq) er
 	return nil
 }
 
-func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) ([]*dtov1.LinkItem, error) {
+func (s *linkService) GetLinks(c context.Context, req *dtov1.GetLinksReq) (*dtov1.GetLinksResp, error) {
 	return s.repo.GetLinks(c, req)
 }
 
 func (s *linkService) UpdateLink(c context.Context, req *dtov1.UpdateLinkReq) error {
+	// 同步校验 OriginalURL 合法性，仅做基础 ip, 链接格式正确性等防护
+	if req.OriginalURL != nil {
+		url, err := util.NormalizeAndValidateURL(c, *req.OriginalURL)
+		if err != nil {
+			return consts.ErrURLNotAllowed
+		}
+		req.OriginalURL = &url
+	}
+
 	code, err := s.repo.UpdateLink(c, req)
 	if err != nil {
 		return err
+	}
+
+	// 如果更改了 OriginalURL，则异步校验链接的安全性
+	if req.OriginalURL != nil {
+		checkReq := &dtov1.CheckLinkReq{
+			EventID:     uuid.NewString(),
+			Code:        code,
+			OriginalURL: *req.OriginalURL,
+		}
+		err = s.publisher.PublishLinkChecked(checkReq)
+		if err != nil {
+			slog.Warn("failed to publish link checked event",
+				slog.String("code", code),
+				slog.String("error", err.Error()))
+		}
 	}
 
 	key := consts.RedisLinkCodeKey + code
@@ -249,7 +320,8 @@ func (s *linkService) DeleteLink(c context.Context, req *dtov1.DeleteLinkReq) er
 func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (string, error) {
 	// 判断 code 是否一定不存在
 	if !s.bloom.MayContain(req.Code) {
-		return "", consts.ErrInvalidLink
+		metrics.RedirectTotal.WithLabelValues("not_found").Inc()
+		return "", consts.ErrLinkNotFound
 	}
 
 	// 如果 code 可能存在 则继续往下走
@@ -275,10 +347,14 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 			cacheMiss = true
 		} else {
 			// 若解析成功，则判断快照是否合法，若合法则继续，不合法则直接返回 ErrInvalidLink
-			if !s.validateLinkCache(&data) {
-				return "", consts.ErrInvalidLink
+			if err := s.validateLinkCache(&data); err != nil {
+				if errors.Is(err, consts.ErrLinkNotFound) {
+					metrics.RedisCacheHitTotal.WithLabelValues("not_found").Inc()
+				}
+				return "", err
 			}
 			originalURL = data.OriginalURL
+			metrics.RedisCacheHitTotal.WithLabelValues("redirect").Inc()
 		}
 	}
 
@@ -288,7 +364,6 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 		if err != nil {
 			return "", err
 		}
-
 		originalURL = data.OriginalURL
 	}
 
@@ -302,6 +377,7 @@ func (s *linkService) Redirect(c context.Context, req *dtov1.ClickLinkReq) (stri
 		}
 	}
 
+	metrics.RedirectTotal.WithLabelValues("success").Inc()
 	return originalURL, nil
 }
 

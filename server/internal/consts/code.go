@@ -7,9 +7,17 @@ const (
 	CodeInvalidEmailCode     = 400002
 	CodeInvalidIdentifier    = 400003
 	CodeInvalidPassword      = 400004
+	CodeInvalidBucket        = 400005
+	CodeInvalidRange         = 400006
+	CodeURLNotAllowed        = 400007
 	CodeUnauthorized         = 401000
 	CodeInvalidRefreshToken  = 401001
 	CodeForbidden            = 403000
+	CodeLinkInactive         = 403001
+	CodeLinkExpired          = 403002
+	CodeLinkPending          = 403003
+	CodeLinkUnsafe           = 403004
+	CodeLinkUnknown          = 403005
 	CodeNotFound             = 404000
 	CodeUserNotFound         = 404001
 	CodeLinkNotFound         = 404002

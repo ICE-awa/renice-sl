@@ -63,3 +63,6 @@ appendonlydir/
 
 # data
 data/
+
+# Kubernetes
+secret.yaml

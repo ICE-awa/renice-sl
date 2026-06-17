@@ -34,7 +34,7 @@ export default function LinkSearchBar({
   }
 
   return (
-    <div className="grid grid-cols-[20%_20%_10%_13%_13%_13%_11%] items-center gap-3">
+    <div className="grid grid-cols-[20%_20%_10%_10%_10%_10%_10%_10%] items-center gap-3">
       <Input
         value={originalUrl}
         onChange={(event) => setOriginalUrl(event.target.value)}
@@ -48,7 +48,7 @@ export default function LinkSearchBar({
         placeholder="搜索短链接后缀"
         className="col-span-1"
       />
-      <div className="col-span-4 flex justify-end gap-2">
+      <div className="col-span-5 flex justify-end gap-2">
         <Button type="button" onClick={handleSearch}>
           搜索
         </Button>

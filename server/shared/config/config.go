@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	Nats     NatsConfig     `mapstructure:"nats"`
-	Jwt      JwtConfig      `mapstructure:"jwt"`
-	Link     LinkConfig     `mapstructure:"link"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	Nats         NatsConfig         `mapstructure:"nats"`
+	Jwt          JwtConfig          `mapstructure:"jwt"`
+	Link         LinkConfig         `mapstructure:"link"`
+	SafeBrowsing SafeBrowsingConfig `mapstructure:"safetybrowsing"`
 }
 
 type ServerConfig struct {
@@ -42,8 +43,8 @@ type NatsConfig struct {
 }
 
 type JwtConfig struct {
-	AccessSecret   string        `mapstructure:"access_token"`
-	RefreshSecret  string        `mapstructure:"refresh_token"`
+	AccessSecret   string        `mapstructure:"access_secret"`
+	RefreshSecret  string        `mapstructure:"refresh_secret"`
 	AccessExpires  time.Duration `mapstructure:"access_expires"`
 	RefreshExpires time.Duration `mapstructure:"refresh_expires"`
 }
@@ -51,6 +52,10 @@ type JwtConfig struct {
 type LinkConfig struct {
 	Expires     time.Duration `mapstructure:"expires"`
 	NullExpires time.Duration `mapstructure:"null_expires"`
+}
+
+type SafeBrowsingConfig struct {
+	APIKey string `mapstructure:"api_key"`
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -91,6 +96,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("jwt.refresh_expires", "JWT_REFRESH_EXPIRES")
 	_ = v.BindEnv("link.expires", "LINK_EXPIRES")
 	_ = v.BindEnv("link.null_expires", "LINK_NULL_EXPIRES")
+	_ = v.BindEnv("safetybrowsing.api_key", "SAFEBROWSING_API_KEY")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
