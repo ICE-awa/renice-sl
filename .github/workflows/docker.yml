@@ -2,7 +2,6 @@ name: Docker
 
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
 
@@ -25,12 +24,12 @@ jobs:
           context: ./server
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/renice-sl-server:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/renice-sl-server:latest
+            ghcr.io/ice_awa/renice-sl-server:${{ github.ref_name }}
+            ghcr.io/ice_awa/renice-sl-server:latest
       - uses: docker/build-push-action@v6
         with:
           context: ./web
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/renice-sl-web:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/renice-sl-web:latest
+            ghcr.io/ice_awa/renice-sl-web:${{ github.ref_name }}
+            ghcr.io/ice_awa/renice-sl-web:latest
