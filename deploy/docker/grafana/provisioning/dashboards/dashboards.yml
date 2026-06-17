@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: renice-sl
+    orgId: 1
+    folder: renice-sl
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

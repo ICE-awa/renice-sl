@@ -1,0 +1,141 @@
+services:
+  renice-sl-migrate:
+    build: ../../server/.
+    command: ["./migrate", "up"]
+    env_file:
+      ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  renice-sl-web:
+    build: ../../web/.
+    container_name: renice-sl-web
+    ports:
+      - "58080:3000"
+    environment:
+      BACKEND_URL: http://renice-sl-api:8080
+    depends_on:
+      renice-sl-api:
+        condition: service_healthy
+
+  renice-sl-api:
+    stop_grace_period: 30s
+    container_name: renice-sl-api
+    build: ../../server/.
+    command: [./api]
+    ports:
+      - "58000:8080"
+    env_file: ./.env
+    depends_on:
+      renice-sl-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  renice-sl-worker:
+    stop_grace_period: 45s
+    container_name: renice-sl-worker
+    build: ../../server/.
+    command: ["./worker"]
+    env_file:
+      - ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18.3-alpine
+    container_name: renice-db
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-renice}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-renice_ice_can_do_this}
+      POSTGRES_DB: ${DATABASE_DBNAME:-renice_sl}
+    #    command:
+    #      - postgres
+    #      - -c
+    #      - shared_preload_libraries=pg_stat_statements
+    #      - -c
+    #      - pg_stat_statements.track=all
+    #      - -c
+    #      - compute_query_id=on
+    ports:
+      - "58001:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "sh -c 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_DBNAME}'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8.6-alpine
+    container_name: renice-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-renice_redis_change_me}
+    ports:
+      - "58002:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.12.6-alpine
+    container_name: renice-nats
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: renice-prometheus
+    ports:
+      - "58003:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - renice-sl-api
+      - renice-sl-worker
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: renice-grafana
+    ports:
+      - "58004:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:
+  nats_data:
+  prometheus_data:
+  grafana_data:

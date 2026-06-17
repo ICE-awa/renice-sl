@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renice-sl-web
+  namespace: renice-sl
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: renice-sl-web
+  template:
+    metadata:
+      labels:
+        app: renice-sl-web
+    spec:
+      containers:
+        - name: renice-sl-web
+          image: renice-sl-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: renice-sl-config
+            - secretRef:
+                name: renice-sl-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: renice-sl-web
+  namespace: renice-sl
+spec:
+  selector:
+    app: renice-sl-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
