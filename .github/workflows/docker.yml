@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -43,8 +44,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deploy
         run: |
-          kubectl set image deployment/renice-sl-server \
-            renice-sl-server=ghcr.io/ice-awa/renice-sl-server:${{ github.ref_name }} \
+          kubectl set image deployment/renice-sl-api \
+            renice-sl-api=ghcr.io/ice-awa/renice-sl-server:${{ github.ref_name }} \
+            -n renice-sl
+          
+          kubectl set image deployment/renice-sl-worker \
+            renice-sl-worker=ghcr.io/ice-awa/renice-sl-server:${{ github.ref_name }} \
             -n renice-sl
           
           kubectl set image deployment/renice-sl-web \
