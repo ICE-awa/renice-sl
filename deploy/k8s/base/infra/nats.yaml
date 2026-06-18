@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: nats
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   selector:
     app: nats
@@ -19,6 +21,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: nats-data
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   accessModes:
     - ReadWriteOnce
@@ -31,6 +35,8 @@ kind: StatefulSet
 metadata:
   name: nats
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   serviceName: nats
   replicas: 1

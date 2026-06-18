@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: redis
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   selector:
     app: redis
@@ -16,6 +18,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: redis-data
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   accessModes:
     - ReadWriteOnce
@@ -28,6 +32,8 @@ kind: StatefulSet
 metadata:
   name: redis
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   serviceName: redis
   replicas: 1

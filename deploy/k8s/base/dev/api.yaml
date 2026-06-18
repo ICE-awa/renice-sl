@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: renice-sl-api
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   replicas: 1
   selector:
@@ -43,6 +45,8 @@ kind: Service
 metadata:
   name: renice-sl-api
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   selector:
     app: renice-sl-api

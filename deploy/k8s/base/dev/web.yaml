@@ -1,40 +1,43 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: renice-sl-worker
+  name: renice-sl-web
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
-      app: renice-sl-worker
+      app: renice-sl-web
   template:
     metadata:
       labels:
-        app: renice-sl-worker
+        app: renice-sl-web
     spec:
       containers:
-        - name: renice-sl-worker
-          image: ghcr.io/ice-awa/renice-sl-server:v0.0.4
+        - name: renice-sl-web
+          image: ghcr.io/ice-awa/renice-sl-web:v0.0.4
           imagePullPolicy: IfNotPresent
-          command: ["./worker"]
+          ports:
+            - containerPort: 3000
           envFrom:
             - configMapRef:
                 name: renice-sl-config
             - secretRef:
                 name: renice-sl-secret
-          ports:
-            - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: renice-sl-worker
+  name: renice-sl-web
   namespace: renice-sl
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   selector:
-    app: renice-sl-worker
+    app: renice-sl-web
   ports:
     - name: http
-      port: 8080
-      targetPort: 8080
+      port: 3000
+      targetPort: 3000
