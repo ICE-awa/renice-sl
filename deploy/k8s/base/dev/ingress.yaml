@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: renice-sl-web-ingress
+  namespace: renice-sl
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sl.renice.cc
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: renice-sl-web
+                port:
+                  number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: renice-sl-shortlink-ingress
+  namespace: renice-sl
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/s/$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: renice.cc
+      http:
+        paths:
+          - path: /s/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: renice-sl-api
+                port:
+                  number: 8080
