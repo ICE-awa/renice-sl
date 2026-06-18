@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: renice-sl-web
-          image: ghcr.io/ice-awa/renice-sl-web:latest
+          image: ghcr.io/ice-awa/renice-sl-web:v0.0.4
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
