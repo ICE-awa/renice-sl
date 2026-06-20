@@ -18,6 +18,7 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: server/go.sum
       - run: go test ./...
+      - run: go test -race ./...
       - run: go build ./cmd/api
       - run: go build ./cmd/worker
       - run: go build ./cmd/migrate
